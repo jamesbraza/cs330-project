@@ -1,2 +1,3 @@
 # cs330-project
-Stanford CSe30: Class Project
+
+Stanford CS330: Class Project
