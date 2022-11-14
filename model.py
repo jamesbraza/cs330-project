@@ -4,9 +4,9 @@ import logging
 import numpy as np
 
 
-class Conv2D(tf.keras.layers.Layer):
+class Bas_Conv2D(tf.keras.layers.Layer):
     def __init__(self, filters, kernel_size, strides,padding):
-        super(Conv2D, self).__init__()
+        super().__init__()
         self.conv = tf.keras.layers.Conv2D(filters=filters,
                                            kernel_size=kernel_size,
                                            strides=strides,
@@ -23,27 +23,25 @@ class Conv2D(tf.keras.layers.Layer):
 
 
 class Model_transfer(tf.keras.Model):
-    def __init__(self, **kwargs):
-        super(Model_transfer, **kwargs).__init__()
-
-
-        self.layer1 = Conv2D(filters=64,
+    def __init__(self):
+        super().__init__()
+        self.layer1 = Bas_Conv2D(filters=64,
                                  kernel_size=(3, 3),
-                                 strides=2)
+                                 strides=2,padding='valid')
 
-        self.layer2 = Conv2D(filters=128,
+        self.layer2 = Bas_Conv2D(filters=128,
                                  kernel_size=(3, 3),
-                                 strides=2)
+                                 strides=2,padding='valid')
 
-        self.layer3 = Conv2D(filters=128,
+        self.layer3 = Bas_Conv2D(filters=128,
                                  kernel_size=(3, 3),
-                                 strides=2)
+                                 strides=2,padding='valid')
 
         self.pooling = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))
 
         self.flatten = tf.keras.layers.Flatten()
         
-        self.dropout = tf.keras.layers.Dropout(rate=0.1)
+        self.dropout = tf.keras.layers.Dropout(rate=0.3)
 
         self.dense = tf.keras.layers.Dense(units=10, activation="softmax")
 
@@ -60,8 +58,8 @@ class Model_transfer(tf.keras.Model):
 
 
 class Model_ChoiceNet_simple(tf.keras.Model):
-    def __init__(self, **kwargs):
-        super(Model_ChoiceNet_simple, **kwargs).__init__()
+    def __init__(self):
+        super().__init__()
 
         self.layer1 = tf.keras.layers.Dense(units=16, activation="relu")
         self.dropout = tf.keras.layers.Dropout(rate=0.1)
