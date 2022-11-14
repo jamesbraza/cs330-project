@@ -78,6 +78,7 @@ def split(
     def is_val(x, _) -> bool:
         return x % 10 < fraction_decimal
 
+    # pylint: disable=unnecessary-lambda-assignment
     is_train = lambda x, y: not is_val(x, y)  # noqa: E731
     recover = lambda _, y: y  # noqa: E731
     train_ds = dataset.enumerate().filter(is_train).map(recover)
@@ -110,7 +111,6 @@ def preprocess_dataset(
             x = image_preprocessor(x)
         # NOTE: one_hot is a transformation step for Tensors, so we use it here
         # over to_categorical
-        # pylint: disable=no-value-for-parameter
         return x, tf.one_hot(y, depth=num_classes)
 
     return dataset.map(_preprocess)
