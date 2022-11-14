@@ -2,8 +2,7 @@ import glob
 import numpy as np
 import os.path
 import cv2
-
-label_path="/Users/annaning/Desktop/cs330/project/data/Fine_tune_data"
+from sklearn import preprocessing
 
 
 def get_file_pair(label_path):
@@ -22,9 +21,13 @@ def get_file_pair(label_path):
             x_path_list.append(j)
 
     y_np=np.array(y_list)
-    return x_path_list ,y_np
+    #====label encode
+    le = preprocessing.LabelEncoder()
+    le.fit(y_np)
+    y_encode=le.transform(y_np)
 
-x_path ,y_label=get_file_pair(label_path)
+    return x_path_list ,y_encode
+
 
 def pre_process(file_names):
     width=28
@@ -38,8 +41,10 @@ def pre_process(file_names):
     return img
 
 
-x_path ,y_label=get_file_pair(label_path)
 
+
+label_path="/Users/annaning/Desktop/cs330/project/data/tl_train3"
+x_path ,y_label=get_file_pair(label_path)
 
 img_list=[]
 for image_path in x_path:
@@ -47,6 +52,8 @@ for image_path in x_path:
     img_list.append(img_np)
 
 img_np=np.array(img_list)   
-np.save('/Users/annaning/Desktop/cs330/project/data/Fine_tune_data/fine_tune_x',img_np)
-np.save('/Users/annaning/Desktop/cs330/project/data/Fine_tune_data/fine_tune_y',y_label)
+
+
+np.save('/Users/annaning/Desktop/cs330/project/data/tl3_x',img_np)
+np.save('/Users/annaning/Desktop/cs330/project/data/tl3_y',y_label)
 
