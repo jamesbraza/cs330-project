@@ -22,7 +22,7 @@ def get_random_datasets(
     Get list of dataset, label pairings.
 
     Args:
-        dataset: Name of the TensorFlow dataset to load.
+        dataset: Name of the TensorFlow dataset to load, default is CIFAR 100.
         num_ds: Number of datasets to fetch, default is 8.
         num_labels: Number of labels per dataset, default is 10.
         num_ex: Number of examples within a dataset, default fetches all.
