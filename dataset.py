@@ -86,7 +86,7 @@ def split(
     return train_ds, val_ds
 
 
-def preprocess_dataset(
+def preprocess(
     dataset: tf.data.Dataset,
     num_classes: int = DEFAULT_NUM_CLASSES,
     image_preprocessor: Callable[[tf.Tensor], tf.Tensor] | None = None,
