@@ -7,6 +7,8 @@ import tensorflow_datasets as tfds
 
 
 class DatasetMetadata(NamedTuple):
+    """Simple class to house metadata on TensorFlow datasets from tfds."""
+
     name: str
     num_classes: int
     image_shape: tuple[int, int, int]
