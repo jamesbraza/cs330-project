@@ -1,3 +1,5 @@
+numpy
 tensorboard
 tensorflow ; platform_system!="Darwin"
+tensorflow-datasets
 tensorflow-macos ; platform_system=="Darwin"

@@ -107,6 +107,7 @@ max-line-length = 120
 # comma-separated, and does not need to specify an error code exactly.
 # D100, D101, D102, D103, D104, D105, D106, D107: don't always need docstrings
 ignore = [
+    "B007",  # Unused locals can be useful
     "D100",
     "D101",
     "D102",
@@ -124,7 +125,7 @@ ignore = [
     "F401",  # Reduces boiler plate of making __all__ for each __init__.py
     "F403",  # Wildcard imports are convenient
     "F405",  # Wildcard imports are convenient
-    "F841",  # Unused locals are useful
+    "F841",  # Unused locals can be useful
     "W503",  # Goes against PEP8 line break before binary operator
 ]
 
