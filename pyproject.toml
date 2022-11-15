@@ -49,6 +49,19 @@ pretty = true
 # Shows a short summary line after error messages.
 error_summary = false
 
+# A comma-separated list of mypy plugins
+plugins = ["numpy.typing.mypy_plugin"]
+
+[[tool.mypy.overrides]]
+
+module = [
+    "tensorflow",
+    "tensorflow_datasets",
+]
+
+# Suppresses error messages about imports that cannot be resolved.
+ignore_missing_imports = true
+
 
 [tool.pylint]
 # SEE: https://github.com/PyCQA/pylint/blob/master/examples/pylintrc
@@ -78,7 +91,6 @@ disable = [
     "unused-wildcard-import",  # Wildcard imports are convenient
     "wildcard-import",  # Wildcard imports are convenient
     "unsubscriptable-object",  # Buggy, SEE: https://github.com/PyCQA/pylint/issues/3637
-    "no-self-use",  # Don't care to enforce this
     "unused-variable",  # Don't care to enforce this
     "invalid-name",  # Don't care to enforce this
     "duplicate-code",  # Don't care to enforce this
