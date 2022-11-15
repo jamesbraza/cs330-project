@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable
 from typing import NamedTuple
 
@@ -18,16 +19,17 @@ class DatasetMetadata(NamedTuple):
 CIFAR10 = DatasetMetadata("cifar10", 10, (32, 32, 3))
 CIFAR100 = DatasetMetadata("cifar100", 100, (32, 32, 3))
 
+DEFAULT_SEED = 42
 DEFAULT_NUM_DATASETS = 8
 DEFAULT_NUM_CLASSES = 10
-DEFAULT_NUM_EXAMPLES = -1
+ALL_EXAMPLES = -1
 
 
 def get_random_datasets(
     dataset: str = CIFAR100.name,
     num_ds: int = DEFAULT_NUM_DATASETS,
     num_classes: int = DEFAULT_NUM_CLASSES,
-    num_ex: int = DEFAULT_NUM_EXAMPLES,
+    num_ex: int = ALL_EXAMPLES,
     subset: str = "train",
 ) -> list[tuple[tf.data.Dataset, np.ndarray]]:
     """
@@ -55,6 +57,59 @@ def get_random_datasets(
         )
         for i in range(num_ds)
     ]
+
+
+TRAIN_VAL_BASE_REL_PATH = "plant-diseases/New Plant Diseases Dataset(Augmented)/New Plant Diseases Dataset(Augmented)"
+TRAIN_REL_PATH_PARTICLES: list[str] = [*TRAIN_VAL_BASE_REL_PATH.split("/"), "train"]
+VAL_REL_PATH_PARTICLES: list[str] = [*TRAIN_VAL_BASE_REL_PATH.split("/"), "valid"]
+PLANT_DISEASES_TRAIN = os.path.join(
+    os.path.dirname(__file__), *TRAIN_REL_PATH_PARTICLES
+)
+PLANT_DISEASES_VAL = os.path.join(os.path.dirname(__file__), *VAL_REL_PATH_PARTICLES)
+
+
+class PlantLabel(NamedTuple):
+    """Simple data structure to house the labels of the plants dataset."""
+
+    raw: str
+    coarse: str
+    fine: str
+
+
+def get_plant_diseases_datasets(
+    num_train_ex: int = ALL_EXAMPLES,
+    num_val_ex: int = ALL_EXAMPLES,
+    seed: int = DEFAULT_SEED,
+) -> tuple[tf.data.Dataset, tf.data.Dataset, list[PlantLabel]]:
+    """
+    Get the training and validation subsets of the plants dataset.
+
+    SEE: https://www.kaggle.com/datasets/vipoooool/new-plant-diseases-dataset
+
+    Args:
+        num_train_ex: Number of examples in the training subset, default fetches all.
+        num_val_ex: Number of examples in the validation subset, default fetches all.
+        seed: Seed to use for train-validation split.
+
+    Returns:
+        Tuple of training dataset, validation dataset, labels.
+            NOTE: for labels, indices correspond with ID, values correspond
+            with string labels.
+    """
+    train_ds = tf.keras.utils.image_dataset_from_directory(
+        PLANT_DISEASES_TRAIN, seed=seed, validation_split=0.1, subset="training"
+    )
+    # NOTE: indices correspond with ID, values correspond with string
+    labels: list[PlantLabel] = [
+        PlantLabel(raw_label, *raw_label.split("___"))
+        for raw_label in train_ds.class_names
+    ]
+    # NOTE: .take() wipes away the ephemeral class_names attribute
+    train_ds = train_ds.take(num_train_ex)
+    val_ds = tf.keras.utils.image_dataset_from_directory(
+        PLANT_DISEASES_TRAIN, seed=seed, validation_split=0.1, subset="validation"
+    ).take(num_val_ex)
+    return train_ds, val_ds, labels
 
 
 def split(
