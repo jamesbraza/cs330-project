@@ -1,3 +1,4 @@
+kaggle
 numpy
 tensorboard
 tensorflow ; platform_system!="Darwin"
