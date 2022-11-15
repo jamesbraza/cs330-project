@@ -2,6 +2,18 @@
 
 [Stanford CS330][1]: Class Project
 
+## Datasets
+
+We are using [New Plant Diseases Dataset][2] from Kaggle, containing 256 x 256 images:
+
+> Image dataset containing different healthy and unhealthy crop leaves.
+
+Here's how to easily download it using the Kaggle API:
+
+```bash
+kaggle datasets download -p plant-diseases --unzip vipoooool/new-plant-diseases-dataset
+```
+
 ## Developers
 
 This project was developed using Python 3.10.
@@ -37,3 +49,4 @@ tensorboard --logdir training
 Afterwards, go to its URL: [http://localhost:6006/](http://localhost:6006/).
 
 [1]: https://cs330.stanford.edu/
+[2]: https://www.kaggle.com/datasets/vipoooool/new-plant-diseases-dataset
