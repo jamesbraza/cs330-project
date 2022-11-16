@@ -46,6 +46,14 @@ Here is how you kick off `tensorboard`:
 tensorboard --logdir training
 ```
 
+
+###UPLOAD TRAINING PROCESS
+1.run_TL_Training.sh TO run transfer learning training 
+2.run_fine_tune.sh TO run fine-tuning training 
+3.run_choice_net.sh run choicenet
+
+pre_process_dataset.py will take a x_process numpy array and reduce dimention to 256 for input into choicenet
+
 Afterwards, go to its URL: [http://localhost:6006/](http://localhost:6006/).
 
 [1]: https://cs330.stanford.edu/
