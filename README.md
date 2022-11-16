@@ -48,7 +48,7 @@ tensorboard --logdir training
 
 
 ### UPLOAD TRAINING PROCESS
-1.run_TL_Training.sh TO run transfer learning training 
+1.run_TL_Training.sh TO run transfer learning training \\
 2.run_fine_tune.sh TO run fine-tuning training 
 3.run_choice_net.sh run choicenet
 
