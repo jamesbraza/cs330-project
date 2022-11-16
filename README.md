@@ -48,9 +48,20 @@ tensorboard --logdir training
 
 
 ### UPLOAD TRAINING PROCESS
-1.run_TL_Training.sh TO run transfer learning training \\
-2.run_fine_tune.sh TO run fine-tuning training 
-3.run_choice_net.sh run choicenet
+
+```bash
+TO run transfer learning training
+bash 1.run_TL_Training.sh
+```
+
+TO run fine-tuning training 
+```bash
+bash 2.run_fine_tune.sh 
+```
+run choicenet
+```bash
+bash 3.run_choice_net.sh 
+```
 
 pre_process_dataset.py will take a x_process numpy array and reduce dimention to 256 for input into choicenet
 
