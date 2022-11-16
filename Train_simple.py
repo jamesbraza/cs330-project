@@ -31,6 +31,22 @@ def custom_loss(y_true, y_pred):
     pert= diff/bottom
     return K.sum(pert)
 
+def lr_strategy(epoch) :
+    lr_start = 0.0001 
+
+    lr_max = 0.001 
+    lr_min = 0.00005 
+    lr_rampup_epochs = 10
+    lr_sustain_epochs = 5
+    lr_exp_decay = 0.8
+    if epoch < lr_rampup_epochs :
+        lr = lr_start + (lr_max-lr_min) / lr_rampup_epochs * epoch
+    elif epoch < lr_rampup_epochs + lr_sustain_epochs :
+        lr = lr_max
+    else :
+        lr = lr_min + (lr_max - lr_min) * lr_exp_decay**(epoch - lr_sustain_epochs - lr_rampup_epochs)
+    return lr
+
 def train_model(args):
     learning_rate = args.learning_rate 
     max_epoch = args.maxEpoch 
@@ -58,10 +74,10 @@ def train_model(args):
     model.build(input_shape=(None,28,28,3))
     model.summary()
 
-    model_save_callback = tf.keras.callbacks.ModelCheckpoint(filepath=log_dir,period=1, save_weights_only=False)
-    model_best_callback = tf.keras.callbacks.ModelCheckpoint(filepath=log_dir, monitor='val_loss', save_best_only=True, mode="min")
+    
+    model_save_callback = tf.keras.callbacks.ModelCheckpoint(log_dir +"/weights/"+ "weights.{epoch:02d}", period=1,save_weights_only=False)
     train_log_callback = tf.keras.callbacks.CSVLogger("training.csv", separator=',')
-
+    lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_strategy, verbose = True)
     #====add tensorboard log
     # folder_name=log_dir.split("/")[-2]
     # log_dir_board="runs/" + folder_name 
@@ -76,9 +92,9 @@ def train_model(args):
                               batch_size=batch_size,
                               validation_data=(X_val,Y_val),
                               callbacks=[model_save_callback,
-                                         model_best_callback,
                                          train_log_callback,
-                                         tensorboard_callback],
+                                         tensorboard_callback,
+                                         ],
                               verbose=1,
                               shuffle=True)
     

@@ -3,7 +3,7 @@ import numpy as np
 import os.path
 import cv2
 from sklearn import preprocessing
-
+from argparse import ArgumentParser, SUPPRESS
 
 def get_file_pair(label_path):
 
@@ -40,20 +40,39 @@ def pre_process(file_names):
     img=np.array(img, dtype="float32")
     return img
 
+def convert_folder_numpy(args):
+    
+
+    label_path=args.label_path
+    output_dir=args.output_dir
 
 
+    x_path ,y_label=get_file_pair(label_path)
 
-label_path="/Users/annaning/Desktop/cs330/project/data/tl_train3"
-x_path ,y_label=get_file_pair(label_path)
+    img_list=[]
+    for image_path in x_path:
+        img_np=pre_process(image_path)
+        img_list.append(img_np)
 
-img_list=[]
-for image_path in x_path:
-    img_np=pre_process(image_path)
-    img_list.append(img_np)
+    img_np=np.array(img_list)   
+    print(">>>>your x shape",img_np.shape)
+    print(">>>>>your y shape",y_label.shape)
+    np.save(os.path.join(output_dir,"x4"),img_np)
+    np.save(os.path.join(output_dir,"y4"),y_label)
 
-img_np=np.array(img_list)   
+def main():
+    parser = ArgumentParser(description="Train parameters ")
+    
+    parser.add_argument('--label_path', type=str, default="/Users/annaning/Desktop/cs330/project/data/find_tune_val",
+                        help="input")
+
+    parser.add_argument('--output_dir', type=str, default="/Users/annaning/Desktop/cs330/project/data/find_tune_val",
+                        help="output_dir")
+
+    args = parser.parse_args()
+
+    convert_folder_numpy(args)
 
 
-np.save('/Users/annaning/Desktop/cs330/project/data/tl3_x',img_np)
-np.save('/Users/annaning/Desktop/cs330/project/data/tl3_y',y_label)
-
+if __name__ == "__main__":
+    main()

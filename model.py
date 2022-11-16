@@ -4,7 +4,7 @@ import logging
 import numpy as np
 
 
-class Bas_Conv2D(tf.keras.layers.Layer):
+class Bas_Conv2D(tf.keras.Model):
     def __init__(self, filters, kernel_size, strides,padding):
         super().__init__()
         self.conv = tf.keras.layers.Conv2D(filters=filters,
@@ -25,6 +25,7 @@ class Bas_Conv2D(tf.keras.layers.Layer):
 class Model_transfer(tf.keras.Model):
     def __init__(self):
         super().__init__()
+
         self.layer1 = Bas_Conv2D(filters=64,
                                  kernel_size=(3, 3),
                                  strides=2,padding='valid')
@@ -60,13 +61,15 @@ class Model_transfer(tf.keras.Model):
 class Model_ChoiceNet_simple(tf.keras.Model):
     def __init__(self):
         super().__init__()
-
-        self.layer1 = tf.keras.layers.Dense(units=16, activation="relu")
+        self.layer1 = tf.keras.layers.Dense(units=512, activation="relu")
+        self.layer2 = tf.keras.layers.Dense(units=256, activation="relu")
         self.dropout = tf.keras.layers.Dropout(rate=0.1)
         self.dense = tf.keras.layers.Dense(units=1)
     
     def call(self, inputs,training=None):
-        x =self.layer1(x)
+
+        x =self.layer1(inputs)
+        x =self.layer2(x)
         x =self.dropout(x,training=training)
         output=self.dense(x)
         return output
