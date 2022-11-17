@@ -1,12 +1,11 @@
 import logging
-import os
-import random
 import sys
-from argparse import SUPPRESS, ArgumentParser
+from argparse import ArgumentParser
 
-import model as model_path
 import numpy as np
 import tensorflow as tf
+
+from models.core import TransferModel
 
 
 def suffle_and_split(X, Y, training_split=0.7):
@@ -25,13 +24,6 @@ def suffle_and_split(X, Y, training_split=0.7):
     X_val = X_shuffle[training_num : training_num + num_validation]
     Y_val = Y_enc[training_num : training_num + num_validation]
     return X_train, Y_train, X_val, Y_val
-
-
-def custom_loss(y_true, y_pred):
-    diff = K.sum(K.square(y_pred - y_true), axis=0)
-    bottom = K.sum(K.square(y_true), axis=0)
-    pert = diff / bottom
-    return K.sum(pert)
 
 
 def lr_strategy(epoch):
@@ -65,14 +57,9 @@ def train_model(args):
     Y = np.load(y_path)
 
     # =====load data and shuffle
-    X_train, Y_train, X_val, Y_val = suffle_and_split(X, Y, training_num=0.7)
+    X_train, Y_train, X_val, Y_val = suffle_and_split(X, Y, training_split=0.7)
 
-    # ====for multi-gpu
-    # strategy = tf.distribute.MirroredStrategy()
-    # print("Number of devices: {}".format(strategy.num_replicas_in_sync))
-
-    # with strategy.scope():
-    model = model_path.Model_transfer()
+    model = TransferModel()
 
     opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
@@ -82,13 +69,10 @@ def train_model(args):
     model.summary()
 
     model_save_callback = tf.keras.callbacks.ModelCheckpoint(
-        log_dir + "/weights/" + "weights.{epoch:02d}", period=1, save_weights_only=False
+        log_dir + "/weights/weights.{epoch:02d}", period=1, save_weights_only=False
     )
     train_log_callback = tf.keras.callbacks.CSVLogger("training.csv", separator=",")
-    lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_strategy, verbose=True)
     # ====add tensorboard log
-    # folder_name=log_dir.split("/")[-2]
-    # log_dir_board="runs/" + folder_name
     tensorboard_callback = tf.keras.callbacks.TensorBoard(
         log_dir=log_dir, histogram_freq=1
     )
@@ -115,35 +99,26 @@ def train_model(args):
 
 def main():
     parser = ArgumentParser(description="Train parameters ")
-
     parser.add_argument(
         "--fine_tune", type=str, default=None, help="fine-tuning weights"
     )
-
     parser.add_argument(
         "--learning_rate", type=float, default=1e-3, help="Set learning rate"
     )
-
     parser.add_argument("--maxEpoch", type=int, default=30, help="Maximum epochs")
-
     parser.add_argument(
         "--batch_size", type=int, default=256, help="Set the batch size for training"
     )
-
     parser.add_argument(
         "--x_path", type=str, default="/data1/cs330/project/project/tl3_x.npy", help="x"
     )
-
     parser.add_argument(
         "--y_path", type=str, default="/data1/cs330/project/project/tl3_y.npy", help="y"
     )
-
     parser.add_argument(
         "--log_dir", type=str, default="/data1/cs330/project/train/model2", help="log"
     )
-
     args = parser.parse_args()
-
     if len(sys.argv[1:]) == 0:
         parser.print_help()
         sys.exit(1)

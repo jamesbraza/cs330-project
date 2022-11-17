@@ -1,11 +1,10 @@
-import os
-import random
 import sys
-from argparse import SUPPRESS, ArgumentParser
+from argparse import ArgumentParser
 
-import model as model_path
 import numpy as np
 import tensorflow as tf
+
+from models.core import ChoiceNetSimple, TransferModel
 
 learning_rate = 0.001
 
@@ -16,7 +15,7 @@ def get_weight_matrix_input(fine_tune_weights_list):
         print(fine_tune_weights)
 
         # ======model weight matrxi embedding:
-        base_model = model_path.Model_transfer()
+        base_model = TransferModel()
         checkpoint = tf.train.Checkpoint(base_model)
         checkpoint.restore(fine_tune_weights).expect_partial()
 
@@ -27,23 +26,16 @@ def get_weight_matrix_input(fine_tune_weights_list):
             metrics=["categorical_accuracy"],
         )
         base_model.build(input_shape=(None, 28, 28, 3))
-        # base_model.summary()
 
         # ======just use last conv layer
         for layer in base_model.layers[2:3]:
-            # print(layer.name)
             weights = layer.get_weights()[0]
             weigth_np = np.array(weights, dtype=object)
             weigth_np_flat = weigth_np.flatten()
-            # print(weigth_np_flat.shape)
-
-        weigth_matrix.append(weigth_np_flat)
+            weigth_matrix.append(weigth_np_flat)
     weigth_matrix_np = np.array(weigth_matrix, dtype=object).astype("float32")
-    # print(weigth_matrix_np.shape)
+
     return weigth_matrix_np
-
-
-# fine_tune_weights_list=["/data1/cs330/project/weight_matrix/model1",'/data1/cs330/project/weight_matrix/model2','/data1/cs330/project/weight_matrix/model3']
 
 
 def train_model(args):
@@ -63,7 +55,7 @@ def train_model(args):
     Y_train = Y_weight[:2]
     Y_val = Y_weight[2:3]
 
-    model = model_path.Model_ChoiceNet_simple()
+    model = ChoiceNetSimple()
 
     opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
@@ -96,30 +88,23 @@ def train_model(args):
 
 def main():
     parser = ArgumentParser(description="Train parameters ")
-
     parser.add_argument(
         "--learning_rate", type=float, default=1e-3, help="Set learning rate"
     )
-
     parser.add_argument("--maxEpoch", type=int, default=30, help="Maximum epochs")
-
     parser.add_argument(
         "--batch_size", type=int, default=1, help="Set the batch size for training"
     )
-
     parser.add_argument(
         "--log_dir", type=str, default="/data1/cs330/project/train/model2", help="log"
     )
-
     parser.add_argument(
         "--fine_tune_weights_list",
         type=str,
         default="/data1/cs330/project/train/model2",
         help="weight list",
     )
-
     args = parser.parse_args()
-
     if len(sys.argv[1:]) == 0:
         parser.print_help()
         sys.exit(1)

@@ -1,21 +1,20 @@
-import os
-import random
 import sys
-from argparse import SUPPRESS, ArgumentParser
+from argparse import ArgumentParser
 
-import model as model_path
 import numpy as np
 import tensorflow as tf
 
+from models.core import TransferModel
 
-def suffle_and_split(X, Y, training_num=0.7):
+
+def suffle_and_split(X, Y, training_split: float = 0.7):
     max_len = Y.shape[0]
     r = np.random.permutation(max_len)
     X_shuffle = X[r, :]
     Y_shuffle = Y[r]
     Y_enc = tf.keras.utils.to_categorical(Y_shuffle)
 
-    training_num = round(training_num * max_len)
+    training_num = round(training_split * max_len)
     num_validation = round(max_len - training_num)
 
     X_train = X_shuffle[:training_num]
@@ -39,14 +38,14 @@ def train_model(args):
     Y = np.load(y_path)
 
     # =====load fine-tune dataset and shuffle
-    X_train, Y_train, X_val, Y_val = suffle_and_split(X, Y, training_num=0.7)
+    X_train, Y_train, X_val, Y_val = suffle_and_split(X, Y, training_split=0.7)
 
     # ====load weights
-    base_model = model_path.Model_transfer()
+    base_model = TransferModel()
     checkpoint = tf.train.Checkpoint(base_model)
     checkpoint.restore(fine_tune_weights).expect_partial()
 
-    # =====defind new model
+    # =====define new model
     new_model = tf.keras.Sequential(
         [*base_model.layers[:-1], tf.keras.layers.Dense(units=8, activation="softmax")]
     )
@@ -66,12 +65,11 @@ def train_model(args):
         print(layer.name, layer.trainable)
 
     model_save_callback = tf.keras.callbacks.ModelCheckpoint(
-        log_dir + "/weights/" + "weights.{epoch:02d}", period=1, save_weights_only=False
+        log_dir + "/weights/weights.{epoch:02d}", period=1, save_weights_only=False
     )
     train_log_callback = tf.keras.callbacks.CSVLogger(
         log_dir + "training.csv", separator=","
     )
-    # lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_strategy, verbose = True)
     # ====add tensorboard log
     tensorboard_callback = tf.keras.callbacks.TensorBoard(
         log_dir=log_dir, histogram_freq=1
@@ -95,51 +93,41 @@ def train_model(args):
 
 def main():
     parser = ArgumentParser(description="Train parameters ")
-
     parser.add_argument(
         "--fine_tune", type=str, default=None, help="fine-tuning weights"
     )
-
     parser.add_argument(
         "--learning_rate", type=float, default=1e-3, help="Set learning rate"
     )
-
     parser.add_argument("--maxEpoch", type=int, default=15, help="Maximum epochs")
-
     parser.add_argument(
         "--batch_size", type=int, default=256, help="Set the batch size for training"
     )
-
     parser.add_argument(
         "--x_path",
         type=str,
         default="/data1/cs330/project/project/fine_tune_x.npy",
         help="x",
     )
-
     parser.add_argument(
         "--y_path",
         type=str,
         default="/data1/cs330/project/project/fine_tune_y.npy",
         help="y",
     )
-
     parser.add_argument(
         "--log_dir",
         type=str,
         default="/data1/cs330/project/fine_tune/model1_tune",
         help="log",
     )
-
     parser.add_argument(
         "--fine_tune_weights",
         type=str,
         default="/data1/cs330/project/train/model1",
         help="weight",
     )
-
     args = parser.parse_args()
-
     if len(sys.argv[1:]) == 0:
         parser.print_help()
         sys.exit(1)

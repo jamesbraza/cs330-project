@@ -1,9 +1,10 @@
 import os
 
 import tensorflow as tf
-from dataset import CIFAR100, get_random_datasets, preprocess, split
 
-from models import MODEL_SAVE_DIR, VGG_TOP_FC_UNITS, get_model
+from data.dataset import CIFAR100, get_random_datasets, preprocess, split
+from models import MODEL_SAVE_DIR
+from models.vgg16 import VGG_TOP_FC_UNITS, get_model
 
 tf.config.run_functions_eagerly(True)
 
