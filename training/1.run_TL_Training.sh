@@ -5,7 +5,7 @@ DIR="/data1/cs330/project/train/model3"
 x_path=""
 y_path=""
 
-python /data1/cs330/project/Train_simple.py \
+python /data1/cs330/project/train_simple.py \
 --learning_rate ${learning_rate} \
 --log_dir ${DIR} \
 --maxEpoch 30 \
