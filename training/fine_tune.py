@@ -99,7 +99,9 @@ def main():
         default="/data1/cs330/project/project/fine_tune_y.npy",
         help="y",
     )
-    parser.add_argument("--log_dir", type=str, default=LOG_DIR, help="log directory")
+    parser.add_argument(
+        "--log_dir", type=str, default=LOG_DIR, help="log base directory"
+    )
     parser.add_argument(
         "--fine_tune_weights",
         type=str,

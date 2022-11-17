@@ -92,7 +92,9 @@ def main():
     parser.add_argument(
         "--batch_size", type=int, default=1, help="Set the batch size for training"
     )
-    parser.add_argument("--log_dir", type=str, default=LOG_DIR, help="log directory")
+    parser.add_argument(
+        "--log_dir", type=str, default=LOG_DIR, help="log base directory"
+    )
     parser.add_argument(
         "--fine_tune_weights_list",
         type=str,

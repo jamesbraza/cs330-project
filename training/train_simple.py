@@ -99,7 +99,9 @@ def main():
     parser.add_argument(
         "--y_path", type=str, default="/data1/cs330/project/project/tl3_y.npy", help="y"
     )
-    parser.add_argument("--log_dir", type=str, default=LOG_DIR, help="log directory")
+    parser.add_argument(
+        "--log_dir", type=str, default=LOG_DIR, help="log base directory"
+    )
     args = parser.parse_args()
     if len(sys.argv[1:]) == 0:
         parser.print_help()
