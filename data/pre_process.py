@@ -1,6 +1,5 @@
-import glob
 import os.path
-from argparse import SUPPRESS, ArgumentParser
+from argparse import ArgumentParser
 
 import cv2
 import numpy as np
@@ -33,15 +32,10 @@ def get_file_pair(label_path):
 
 
 def pre_process(file_names):
-    width = 28
-    height = 28
-    dim = (width, height)
-    img1 = cv2.imread(file_names, 1)
-    img1 = cv2.resize(img1, dim, interpolation=cv2.INTER_AREA)
-    img = img1[..., ::-1]
-    img = np.around(img / 255.0, decimals=12)
-    img = np.array(img, dtype="float32")
-    return img
+    img1 = cv2.resize(
+        cv2.imread(file_names, 1), dsize=(28, 28), interpolation=cv2.INTER_AREA
+    )
+    return np.array(img1[..., ::-1] / 255.0, dtype="float32")
 
 
 def convert_folder_numpy(args):

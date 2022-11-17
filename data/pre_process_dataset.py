@@ -1,14 +1,11 @@
 import glob
 import os.path
-from argparse import SUPPRESS, ArgumentParser
 
-import cv2
 import numpy as np
-from sklearn import preprocessing
 from sklearn.decomposition import PCA
 
 
-def pca_dataset(path_dir):
+def pca_dataset(path_dir) -> None:
     data_path = glob.glob(os.path.join(path_dir, "*.npy"))
 
     print(data_path)
@@ -33,5 +30,4 @@ def pca_dataset(path_dir):
 
 
 if __name__ == "__main__":
-    path_dir = "/Users/annaning/Desktop/cs330/project/data/x_feature"
-    pca_dataset(path_dir)
+    pca_dataset(path_dir="/Users/annaning/Desktop/cs330/project/data/x_feature")
