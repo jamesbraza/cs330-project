@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 from models.core import TransferModel
+from training import LOG_DIR
 from training.utils import shuffle_and_split
 
 
@@ -98,9 +99,7 @@ def main():
     parser.add_argument(
         "--y_path", type=str, default="/data1/cs330/project/project/tl3_y.npy", help="y"
     )
-    parser.add_argument(
-        "--log_dir", type=str, default="/data1/cs330/project/train/model2", help="log"
-    )
+    parser.add_argument("--log_dir", type=str, default=LOG_DIR, help="log directory")
     args = parser.parse_args()
     if len(sys.argv[1:]) == 0:
         parser.print_help()

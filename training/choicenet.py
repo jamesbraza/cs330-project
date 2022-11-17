@@ -5,6 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from models.core import ChoiceNetSimple, TransferModel
+from training import LOG_DIR
 
 
 def get_weight_matrix_input(fine_tune_weights_list, learning_rate: float):
@@ -91,9 +92,7 @@ def main():
     parser.add_argument(
         "--batch_size", type=int, default=1, help="Set the batch size for training"
     )
-    parser.add_argument(
-        "--log_dir", type=str, default="/data1/cs330/project/train/model2", help="log"
-    )
+    parser.add_argument("--log_dir", type=str, default=LOG_DIR, help="log directory")
     parser.add_argument(
         "--fine_tune_weights_list",
         type=str,
