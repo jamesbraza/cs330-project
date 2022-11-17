@@ -11,7 +11,7 @@ We are using [New Plant Diseases Dataset][2] from Kaggle, containing 256 x 256 i
 Here's how to easily download it using the Kaggle API:
 
 ```bash
-kaggle datasets download -p plant-diseases --unzip vipoooool/new-plant-diseases-dataset
+kaggle datasets download -p data/plant-diseases --unzip vipoooool/new-plant-diseases-dataset
 ```
 
 ## Developers

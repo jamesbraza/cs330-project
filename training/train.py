@@ -2,9 +2,10 @@ import os
 
 import tensorflow as tf
 
-from data.dataset import CIFAR100, get_random_datasets, preprocess, split
+from data.dataset import DATASET_CONFIGS, get_random_datasets, preprocess, split
 from models import MODEL_SAVE_DIR
 from models.vgg16 import VGG_TOP_FC_UNITS, get_model
+from training import LOG_DIR
 
 # Num epochs if not early stopped
 MAX_NUM_EPOCHS = 64
@@ -17,29 +18,27 @@ BATCH_SIZE = 20
 VALIDATION_STEPS: int | None = None
 # Set to a nickname for the save file to help facilitate reuse
 SAVE_NICKNAME: str = "bananas"
-# Directory to place logs for TensorBoard
-LOG_DIR = os.path.dirname(__file__)
 # Dataset being used for experiment
-DATASET = CIFAR100
+DATASET_CONFIG = DATASET_CONFIGS["cifar100"]
 
 for i, (dataset, labels) in enumerate(
-    get_random_datasets(dataset=DATASET.name, num_ex=200)
+    get_random_datasets(dataset=DATASET_CONFIG.name, num_ex=200)
 ):
     model = get_model(
         top_fc_units=(*VGG_TOP_FC_UNITS[:-1], 100),
-        image_shape=DATASET.image_shape,
+        image_shape=DATASET_CONFIG.image_shape,
     )
     model.compile(
         optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"]
     )
     train_ds, val_ds = split(dataset)
     train_ds = (
-        preprocess(train_ds, num_classes=DATASET.num_classes)
+        preprocess(train_ds, num_classes=DATASET_CONFIG.num_classes)
         .batch(BATCH_SIZE)
         .prefetch(tf.data.AUTOTUNE)
     )
     val_ds = (
-        preprocess(val_ds, num_classes=DATASET.num_classes)
+        preprocess(val_ds, num_classes=DATASET_CONFIG.num_classes)
         .batch(BATCH_SIZE)
         .prefetch(tf.data.AUTOTUNE)
     )

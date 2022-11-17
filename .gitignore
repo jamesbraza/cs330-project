@@ -276,4 +276,10 @@ fabric.properties
 *.vsix
 
 # Datasets
-plant-diseases
+data/plant-diseases
+
+# Logs
+training/logs
+
+# Models
+models/saved_models
