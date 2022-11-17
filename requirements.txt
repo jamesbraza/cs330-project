@@ -1,5 +1,7 @@
 kaggle
 numpy
+opencv-python
+scikit-learn
 tensorboard
 tensorflow ; platform_system!="Darwin"
 tensorflow-datasets
