@@ -1,10 +1,6 @@
-import os
 from typing import TypeAlias
 
 import tensorflow as tf
-
-# Directory where models will be saved
-MODEL_SAVE_DIR = os.path.join(os.path.dirname(__file__), "saved_models")
 
 VGG_IMAGE_SIZE = (224, 224)
 VGG_IMAGE_SHAPE = (*VGG_IMAGE_SIZE, 3)  # RGB
