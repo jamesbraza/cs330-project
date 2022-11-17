@@ -1,53 +1,56 @@
-from typing import TypeAlias
-
 import tensorflow as tf
 
-VGG_IMAGE_SIZE = (224, 224)
-VGG_IMAGE_SHAPE = (*VGG_IMAGE_SIZE, 3)  # RGB
-TopFCUnits: TypeAlias = tuple[int, ...]
-VGG_TOP_FC_UNITS: TopFCUnits = (4096, 4096, 1000)  # From the paper to match ImageNet
+
+class Conv2D(tf.keras.Model):
+    def __init__(self, filters, kernel_size, strides, padding):
+        super().__init__()
+        self.conv = tf.keras.layers.Conv2D(
+            filters=filters, kernel_size=kernel_size, strides=strides, padding=padding
+        )
+        self.bn = tf.keras.layers.BatchNormalization()
+        self.relu = tf.keras.layers.ReLU()
+
+    def call(self, inputs, training=None, mask=None):
+        output = self.conv(inputs)
+        output = self.bn(output)
+        return self.relu(output)
 
 
-def get_model(
-    top_fc_units: TopFCUnits = VGG_TOP_FC_UNITS,
-    image_shape: tuple[int, int, int] = VGG_IMAGE_SHAPE,
-    base_model: tf.keras.Model | None = None,
-) -> tf.keras.Model:
-    """
-    Make a VGG16 model given info on the top FC units.
+class TransferModel(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+        self.layer1 = Conv2D(filters=64, kernel_size=(3, 3), strides=2, padding="valid")
+        self.layer2 = Conv2D(
+            filters=128, kernel_size=(3, 3), strides=2, padding="valid"
+        )
+        self.layer3 = Conv2D(
+            filters=128, kernel_size=(3, 3), strides=2, padding="valid"
+        )
+        self.pooling = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))
+        self.flatten = tf.keras.layers.Flatten()
+        self.dropout = tf.keras.layers.Dropout(rate=0.3)
+        self.dense = tf.keras.layers.Dense(units=10, activation="softmax")
 
-    Args:
-        top_fc_units: Number of units to use in each of the top FC layers.
-            Default is three FC layers per the VGGNet paper.
-            Last value in the tuple should match your number of classes.
-        image_shape: Shape of the images input to the model.
-            Default is the size of images per the VGGNet paper.
-        base_model: Optional base model to use for transfer learning.
-            If left as default of None, use Keras VGG16 trained on ImageNet.
+    def call(self, inputs, training=None, mask=None):
+        x = self.layer1(inputs)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.pooling(x)
+        x = self.flatten(x)
+        x = self.dropout(x, training=training)
+        return self.dense(x)
 
-    Returns:
-        VGG16 model created.
-    """
-    if base_model is None:
-        base_model = tf.keras.applications.VGG16(weights=None, include_top=False)
-    dense_layers = [
-        tf.keras.layers.Dense(units=units, activation="relu", name=f"fc{i+1}")
-        for i, units in enumerate(top_fc_units[:-1])
-    ]
-    return tf.keras.Sequential(
-        [
-            tf.keras.Input(shape=image_shape),
-            tf.keras.layers.Lambda(
-                function=tf.keras.applications.vgg16.preprocess_input,
-                name="preprocess_images",
-            ),
-            base_model,
-            tf.keras.layers.Flatten(),
-            *dense_layers,
-            # Last layer matches number of classes
-            tf.keras.layers.Dense(
-                units=top_fc_units[-1], activation="softmax", name="predictions"
-            ),
-        ],
-        name="tl_vgg16",
-    )
+
+class ChoiceNetSimple(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+        self.layer1 = tf.keras.layers.Dense(units=512, activation="relu")
+        self.layer2 = tf.keras.layers.Dense(units=256, activation="relu")
+        self.dropout = tf.keras.layers.Dropout(rate=0.1)
+        self.dense = tf.keras.layers.Dense(units=1)
+
+    def call(self, inputs, training=None, mask=None):
+        x = self.layer1(inputs)
+        x = self.layer2(x)
+        x = self.dropout(x, training=training)
+        return self.dense(x)
