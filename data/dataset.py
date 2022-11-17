@@ -31,6 +31,7 @@ def get_random_datasets(
     num_classes: int = DEFAULT_NUM_CLASSES,
     num_ex: int = ALL_EXAMPLES,
     subset: str = "train",
+    seed: int = DEFAULT_SEED,
 ) -> list[tuple[tf.data.Dataset, np.ndarray]]:
     """
     Get list of dataset, label pairings.
@@ -41,13 +42,15 @@ def get_random_datasets(
         num_classes: Number of classes per dataset, default is 10.
         num_ex: Number of examples within a dataset, default fetches all.
         subset: Subset to sample from, either train (default) or test.
+        seed: Seed to use for getting random datasets.
 
     Returns:
         List of tuples of dataset, labels (int).
     """
     full_ds = tfds.load(name=dataset, split=subset, as_supervised=True)
     full_labels = np.fromiter(set(int(label) for _, label in full_ds), dtype=int)
-    labels = np.random.choice(full_labels, size=(num_ds, num_classes), replace=False)
+    rng = np.random.default_rng(seed)
+    labels = rng.choice(full_labels, size=(num_ds, num_classes), replace=False)
     return [
         (
             full_ds.filter(lambda x, y, row=i: tf.reduce_any(y == labels[row])).take(
