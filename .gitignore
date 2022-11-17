@@ -1,3 +1,4 @@
+
 # General
 .DS_Store
 .AppleDouble
@@ -280,3 +281,6 @@ data/plant-diseases
 
 # Logs
 training/logs
+
+# Models
+models/saved_models
