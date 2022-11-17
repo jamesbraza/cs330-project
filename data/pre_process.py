@@ -58,24 +58,19 @@ def convert_folder_numpy(args):
 
 def main():
     parser = ArgumentParser(description="Train parameters ")
-
     parser.add_argument(
         "--label_path",
         type=str,
         default="/Users/annaning/Desktop/cs330/project/data/find_tune_val",
         help="input",
     )
-
     parser.add_argument(
         "--output_dir",
         type=str,
         default="/Users/annaning/Desktop/cs330/project/data/find_tune_val",
         help="output_dir",
     )
-
-    args = parser.parse_args()
-
-    convert_folder_numpy(args)
+    convert_folder_numpy(args=parser.parse_args())
 
 
 if __name__ == "__main__":
