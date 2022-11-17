@@ -276,4 +276,4 @@ fabric.properties
 *.vsix
 
 # Datasets
-plant-diseases
+data/plant-diseases
