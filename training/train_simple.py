@@ -9,23 +9,23 @@ from models.core import TransferModel
 from training.utils import shuffle_and_split
 
 
-def lr_strategy(epoch):
-    lr_start = 0.0001
-
-    lr_max = 0.001
-    lr_min = 0.00005
-    lr_rampup_epochs = 10
-    lr_sustain_epochs = 5
-    lr_exp_decay = 0.8
-    if epoch < lr_rampup_epochs:
-        lr = lr_start + (lr_max - lr_min) / lr_rampup_epochs * epoch
-    elif epoch < lr_rampup_epochs + lr_sustain_epochs:
-        lr = lr_max
-    else:
-        lr = lr_min + (lr_max - lr_min) * lr_exp_decay ** (
-            epoch - lr_sustain_epochs - lr_rampup_epochs
-        )
-    return lr
+def lr_strategy(
+    epoch: int,
+    start: float = 0.0001,
+    min_max: tuple[float, float] = (0.00005, 0.001),
+    rampup_epochs: int = 10,
+    sustain_epochs: int = 5,
+    exp_decay: float = 0.8,
+) -> float:
+    lr_min, lr_max = min_max
+    if epoch < rampup_epochs:  # Linear ramp up
+        return start + (lr_max - lr_min) * (epoch / rampup_epochs)
+    if epoch < (rampup_epochs + sustain_epochs):  # Plateau
+        return lr_max
+    # Exponentially decay down
+    return lr_min + (lr_max - lr_min) * exp_decay ** (
+        epoch - (sustain_epochs + rampup_epochs)
+    )
 
 
 def train_model(args):
