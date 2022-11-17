@@ -6,15 +6,13 @@ import tensorflow as tf
 
 from models.core import ChoiceNetSimple, TransferModel
 
-learning_rate = 0.001
 
-
-def get_weight_matrix_input(fine_tune_weights_list):
+def get_weight_matrix_input(fine_tune_weights_list, learning_rate: float):
     weigth_matrix = []
     for fine_tune_weights in fine_tune_weights_list:
         print(fine_tune_weights)
 
-        # ======model weight matrxi embedding:
+        # ======model weight matrix embedding:
         base_model = TransferModel()
         checkpoint = tf.train.Checkpoint(base_model)
         checkpoint.restore(fine_tune_weights).expect_partial()
@@ -33,9 +31,7 @@ def get_weight_matrix_input(fine_tune_weights_list):
             weigth_np = np.array(weights, dtype=object)
             weigth_np_flat = weigth_np.flatten()
             weigth_matrix.append(weigth_np_flat)
-    weigth_matrix_np = np.array(weigth_matrix, dtype=object).astype("float32")
-
-    return weigth_matrix_np
+    return np.array(weigth_matrix, dtype="float32")
 
 
 def train_model(args):
@@ -47,7 +43,7 @@ def train_model(args):
 
     # =======get weight matri THIS PART IS NOT FINAL !!!!!
     # TODO
-    X_weight = get_weight_matrix_input(fine_tune_weights_list)
+    X_weight = get_weight_matrix_input(fine_tune_weights_list, learning_rate)
     X_train = X_weight[:2]
     X_val = X_weight[2:3]
 
@@ -65,7 +61,7 @@ def train_model(args):
     model.summary()
 
     model_save_callback = tf.keras.callbacks.ModelCheckpoint(
-        log_dir + "/weights/" + "weights.{epoch:02d}", period=1, save_weights_only=False
+        log_dir + "/weights/weights.{epoch:02d}", period=1, save_weights_only=False
     )
     train_log_callback = tf.keras.callbacks.CSVLogger(
         log_dir + "training.csv", separator=","

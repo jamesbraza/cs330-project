@@ -6,8 +6,6 @@ from data.dataset import CIFAR100, get_random_datasets, preprocess, split
 from models import MODEL_SAVE_DIR
 from models.vgg16 import VGG_TOP_FC_UNITS, get_model
 
-tf.config.run_functions_eagerly(True)
-
 # Num epochs if not early stopped
 MAX_NUM_EPOCHS = 64
 # Patience of EarlyStopping callback
