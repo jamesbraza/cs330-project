@@ -1,5 +1,5 @@
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import NamedTuple
 
 import numpy as np
@@ -15,9 +15,10 @@ class DatasetMetadata(NamedTuple):
     image_shape: tuple[int, int, int]
 
 
-# Available datasets: https://www.tensorflow.org/datasets/catalog/overview
-CIFAR10 = DatasetMetadata("cifar10", 10, (32, 32, 3))
-CIFAR100 = DatasetMetadata("cifar100", 100, (32, 32, 3))
+DATASET_CONFIGS: dict[str, DatasetMetadata] = {
+    "cifar10": DatasetMetadata("cifar10", 10, (32, 32, 3)),
+    "cifar100": DatasetMetadata("cifar100", 100, (32, 32, 3)),
+}
 
 DEFAULT_SEED = 42
 DEFAULT_NUM_DATASETS = 8
@@ -26,7 +27,7 @@ ALL_EXAMPLES = -1
 
 
 def get_random_datasets(
-    dataset: str = CIFAR100.name,
+    dataset: str = "cifar100",
     num_ds: int = DEFAULT_NUM_DATASETS,
     num_classes: int = DEFAULT_NUM_CLASSES,
     num_ex: int = ALL_EXAMPLES,
@@ -60,6 +61,28 @@ def get_random_datasets(
         )
         for i in range(num_ds)
     ]
+
+
+def get_dataset_subset(
+    labels: Sequence[int],
+    dataset: str = "cifar100",
+    num_ex: int = ALL_EXAMPLES,
+    subset: str = "train",
+) -> tf.data.Dataset:
+    """
+    Get the subset of a dataset corresponding to the input labels.
+
+    Args:
+        labels: Sequence of labels to fetch
+        dataset: Name of the TensorFlow dataset to load, default is CIFAR 100.
+        num_ex: Number of examples within a dataset, default fetches all.
+        subset: Subset to sample from, either train (default) or test.
+
+    Returns:
+        Matching dataset.
+    """
+    full_ds = tfds.load(name=dataset, split=subset, as_supervised=True)
+    return full_ds.filter(lambda x, y: tf.reduce_any(y == labels)).take(num_ex)
 
 
 TRAIN_VAL_BASE_REL_PATH = "plant-diseases/New Plant Diseases Dataset(Augmented)/New Plant Diseases Dataset(Augmented)"
