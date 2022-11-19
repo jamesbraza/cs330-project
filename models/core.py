@@ -22,7 +22,7 @@ class Conv2D(tf.keras.Model):
 
 
 class TransferModel(tf.keras.Model):
-    def __init__(self, input_shape: Shape, num_classes: int = 10):
+    def __init__(self, input_shape: Shape = (28, 28, 3), num_classes: int = 10):
         super().__init__()
         # Include input_layer so we can infer input shape for copy
         self.input_layer = tf.keras.layers.InputLayer(input_shape)
