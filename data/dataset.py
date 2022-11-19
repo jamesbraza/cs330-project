@@ -214,9 +214,9 @@ def preprocess(
 
 def main() -> None:
     """Play around with code here."""
-    labelled_datasets = get_random_datasets(num_ex=200)
+    labelled_datasets = get_random_datasets(num_batches=7)
     for ds, labels in labelled_datasets:
-        for image, label in ds.prefetch(10):
+        for image, label in ds:
             _ = 0  # Debug here
 
 
