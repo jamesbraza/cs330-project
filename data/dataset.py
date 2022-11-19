@@ -1,10 +1,12 @@
 import os
 from collections.abc import Callable, Sequence
-from typing import NamedTuple
+from typing import NamedTuple, TypeAlias
 
 import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
+
+Shape: TypeAlias = Sequence[int | None]
 
 
 class DatasetMetadata(NamedTuple):
@@ -12,7 +14,7 @@ class DatasetMetadata(NamedTuple):
 
     name: str
     num_classes: int
-    image_shape: tuple[int, int, int]
+    image_shape: Shape
 
 
 DATASET_CONFIGS: dict[str, DatasetMetadata] = {
