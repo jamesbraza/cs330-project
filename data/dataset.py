@@ -106,6 +106,7 @@ def get_plant_diseases_datasets(
     num_train_ex: int = ALL_EXAMPLES,
     num_val_ex: int = ALL_EXAMPLES,
     seed: int = DEFAULT_SEED,
+    **from_dir_kwargs,
 ) -> tuple[tf.data.Dataset, tf.data.Dataset, list[PlantLabel]]:
     """
     Get the training and validation subsets of the plants dataset.
@@ -116,14 +117,17 @@ def get_plant_diseases_datasets(
         num_train_ex: Number of examples in the training subset, default fetches all.
         num_val_ex: Number of examples in the validation subset, default fetches all.
         seed: Seed to use for train-validation split.
+        from_dir_kwargs: Override keyword arguments to pass through to both
+            tf.keras.utils.image_dataset_from_directory calls.
 
     Returns:
         Tuple of training dataset, validation dataset, labels.
             NOTE: for labels, indices correspond with ID, values correspond
             with string labels.
     """
+    from_dir_kwargs = {"seed": seed, "validation_split": 0.1} | from_dir_kwargs
     train_ds = tf.keras.utils.image_dataset_from_directory(
-        PLANT_DISEASES_TRAIN, seed=seed, validation_split=0.1, subset="training"
+        PLANT_DISEASES_TRAIN, subset="training", **from_dir_kwargs
     )
     # NOTE: indices correspond with ID, values correspond with string
     labels: list[PlantLabel] = [
@@ -133,7 +137,7 @@ def get_plant_diseases_datasets(
     # NOTE: .take() wipes away the ephemeral class_names attribute
     train_ds = train_ds.take(num_train_ex)
     val_ds = tf.keras.utils.image_dataset_from_directory(
-        PLANT_DISEASES_TRAIN, seed=seed, validation_split=0.1, subset="validation"
+        PLANT_DISEASES_TRAIN, subset="validation", **from_dir_kwargs
     ).take(num_val_ex)
     return train_ds, val_ds, labels
 
