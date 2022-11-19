@@ -57,6 +57,8 @@ plugins = ["numpy.typing.mypy_plugin"]
 module = [
     "tensorflow",
     "tensorflow_datasets",
+    "cv2",
+    "sklearn.decomposition",
 ]
 
 # Suppresses error messages about imports that cannot be resolved.
