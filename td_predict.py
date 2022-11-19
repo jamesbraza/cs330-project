@@ -34,28 +34,35 @@ def get_weight_matrix_input_predict(fine_tune_weights):
     return weigth_np_r
 
 def predict(args):
-    fine_tune_weights =args.fine_tune_weights
+    x_weights_matrix =args.x_weights_matrix
+    data_matrix =args.data_matrix
     choice_net_weights=args.choice_net_weights
 
-    X_test=get_weight_matrix_input_predict(fine_tune_weights)
-
+    X_test=np.load(x_weights_matrix)
+    X_test2=np.load(data_matrix)
     #load model
+    print(">>>>your fist",X_test.shape)
+    print(">>>>your 2nd X",X_test2.shape)
+
     model=model_path.Model_ChoiceNet_simple()
     checkpoint = tf.train.Checkpoint(model)
     checkpoint.restore(choice_net_weights).expect_partial()
 
-    pred=model.predict(X_test,verbose=0)
+    pred=model.predict([X_test,X_test2],verbose=0)
     print(">>>>your prediction",pred)
 
 
 def main():
     parser = ArgumentParser(description="Train parameters ")
 
-    parser.add_argument('--fine_tune_weights', type=str, default="/data1/cs330/project/weight_matrix/model1",
+    parser.add_argument('--x_weights_matrix', type=str, default="/data1/cs330/project/data/x_feature_test/weight_training_matrix.npy",
                         help="path for the reducd weight matrix")
     
-    parser.add_argument('--choice_net_weights', type=str, default="/data1/cs330/project/tdl_model/weight_net/weights",
+    parser.add_argument('--choice_net_weights', type=str, default="/data1/cs330/project/tdl_model/tdl_2input/weights",
                         help="weights for choicenet")
+
+    parser.add_argument('--data_matrix', type=str, default="/data1/cs330/project/data/x_feature_test/x_test_new.npy",
+                        help="dataset duplicate for number of network")
     
     args = parser.parse_args()
 

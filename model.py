@@ -75,16 +75,18 @@ class Model_ChoiceNet_simple(tf.keras.Model):
 
         self.layer_reduce = Reduce_matrix(conv_filter_dim=1152,reduced_dim=16)
         self.flat=self.flatten = tf.keras.layers.Flatten()
-        self.layer1 = tf.keras.layers.Dense(units=32, activation="relu")
-        self.dropout = tf.keras.layers.Dropout(rate=0.1)
+        self.layer1 = tf.keras.layers.Dense(units=128, activation="relu")
+        self.dropout = tf.keras.layers.Dropout(rate=0.3)
         self.dense = tf.keras.layers.Dense(units=1)
     
     def call(self, inputs,training=None):
         #=====dimention reduction for nn layers
-
-        x = self.layer_reduce(inputs)
+        x1=inputs[0]
+        x2=inputs[1]
+        x = self.layer_reduce(x1)
         x = self.flat(x)
-        x = self.layer1(x)
+        concat = tf.concat([x,x2],axis=1)
+        x = self.layer1(concat)
         x = self.dropout(x,training=training)
         output=self.dense(x)
         return output
