@@ -2,7 +2,6 @@ import argparse
 import math
 import os
 
-import numpy as np
 import tensorflow as tf
 
 from data.dataset import (
@@ -132,14 +131,7 @@ def train(args: argparse.Namespace) -> None:
         )
 
         # 6. Perform predictions on the test dataset
-        num_all_correct, count = 0, 0
-        for batch_images, batch_labels in test_ds:
-            num_all_correct += np.sum(
-                new_model.predict(batch_images).argmax(axis=1)
-                == tf.argmax(batch_labels, axis=1)
-            )
-            count += batch_labels.shape[0]
-        accuracy = num_all_correct / count
+        loss, accuracy = new_model.evaluate(test_ds)
         _ = 0
 
     _ = 0
@@ -175,13 +167,13 @@ def main() -> None:
     parser.add_argument(
         "--tl_num_batches",
         type=int,
-        default=math.ceil(2000 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(3000 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in each transfer learning dataset",
     )
     parser.add_argument(
         "--ft_num_batches",
         type=int,
-        default=math.ceil(200 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(1000 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in the fine tuning dataset",
     )
     parser.add_argument(
