@@ -1,14 +1,13 @@
+import os
+
 import numpy as np
 from sklearn.decomposition import PCA
 
 
-def pca_dataset(data_path, X_shape=7):
-    all_data_list = []
-
+def pca_dataset(data_path, X_shape: int = 7):
     data_matrix = np.load(data_path)
 
     # ====fill in nan
-    print(data_matrix.shape)
     batch = data_matrix.shape[0]
     x1 = data_matrix.reshape(batch, 28 * 28 * 3)
 
@@ -20,12 +19,11 @@ def pca_dataset(data_path, X_shape=7):
     x_average_r = x_average[np.newaxis, :]
     print(x_average_r.shape)
     all_data_np = np.repeat(x_average_r, repeats=X_shape, axis=0)
-
     print(">>>>>your reduced feature input", all_data_np.shape)
     return all_data_np
 
 
 if __name__ == "__main__":
-    path_dir = "/data1/cs330/project/data/code/X_test.npy"
-    all_data_np = pca_dataset(path_dir, X_shape=2)
-    np.save("/data1/cs330/project/data/x_feature_test/x_test_new.npy", all_data_np)
+    dirname = os.path.dirname(__file__)
+    all_data_np = pca_dataset(data_path=os.path.join(dirname, "X_test.npy"), X_shape=2)
+    np.save(os.path.join(dirname, "x_test_new.npy"), all_data_np)
