@@ -37,22 +37,20 @@ def train(args: argparse.Namespace) -> None:
     dataset_config = DATASET_CONFIGS[args.dataset]
 
     seed_nickname = [str(args.seed), args.run_nickname]
-    base_models_dir = os.path.join(MODEL_SAVE_DIR, "base_models", *seed_nickname)
-    tl_models_dir = os.path.join(MODEL_SAVE_DIR, "tl_models", *seed_nickname)
-    ft_models_dir = os.path.join(MODEL_SAVE_DIR, "ft_models", *seed_nickname)
-    tl_log_dir = os.path.join(LOG_DIR, "tl_logs", *seed_nickname)
-    ft_log_dir = os.path.join(LOG_DIR, "ft_logs", *seed_nickname)
 
     # NOTE: these are already batched
-    ft_ds, test_ds, ft_test_labels = get_plant_diseases_datasets(
+    ft_ds, test_ds, plants_labels = get_plant_diseases_datasets(
         num_train_batch=args.ft_num_batches,
         num_val_batch=args.test_num_batches,
         seed=args.seed,
         batch_size=args.batch_size,
         image_size=dataset_config.image_shape[:-1],
     )
+    test_labels = np.array(
+        [label.numpy() for batch in test_ds for label in batch[1]], dtype=int
+    )
     ft_ds, test_ds = (
-        preprocess_standardize(ds, num_classes=len(ft_test_labels))
+        preprocess_standardize(ds, num_classes=len(plants_labels))
         for ds in (ft_ds, test_ds)
     )
 
@@ -61,7 +59,7 @@ def train(args: argparse.Namespace) -> None:
     )
 
     # 1. Save randomly initialized weights to begin training with the same state
-    base_weights_path = os.path.join(base_models_dir)
+    base_weights_path = os.path.join(MODEL_SAVE_DIR, "base_models", *seed_nickname)
     model.save_weights(base_weights_path)
 
     for i, (dataset, labels) in enumerate(
@@ -95,14 +93,19 @@ def train(args: argparse.Namespace) -> None:
             validation_data=val_ds,
             callbacks=[
                 tf.keras.callbacks.TensorBoard(
-                    log_dir=os.path.join(tl_log_dir, labels_name), histogram_freq=1
+                    log_dir=os.path.join(
+                        LOG_DIR, "tl_logs", *seed_nickname, labels_name
+                    ),
+                    histogram_freq=1,
                 )
             ],
         )
-        model.save_weights(os.path.join(tl_models_dir, labels_name))
+        model.save_weights(
+            os.path.join(MODEL_SAVE_DIR, "tl_models", *seed_nickname, labels_name)
+        )
 
         # 4. Prepare for fine-tuning
-        new_model = model.to_fine_tuning(new_num_classes=len(ft_test_labels))
+        new_model = model.to_fine_tuning(new_num_classes=len(plants_labels))
         # NOTE: reset the optimizer before fine-tuning
         new_model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
@@ -116,14 +119,20 @@ def train(args: argparse.Namespace) -> None:
             epochs=args.num_epochs,
             callbacks=[
                 tf.keras.callbacks.TensorBoard(
-                    log_dir=os.path.join(ft_log_dir, labels_name), histogram_freq=1
+                    log_dir=os.path.join(
+                        LOG_DIR, "ft_logs", *seed_nickname, labels_name
+                    ),
+                    histogram_freq=1,
                 )
             ],
         )
-        new_model.save_weights(os.path.join(ft_models_dir, labels_name))
+        new_model.save_weights(
+            os.path.join(MODEL_SAVE_DIR, "ft_models", *seed_nickname, labels_name)
+        )
 
         # 6. Perform predictions on the test dataset
         preds: np.ndarray = new_model.predict(test_ds).argmax(axis=1)
+        accuracy = np.mean(preds == test_labels)
         _ = 0
 
     _ = 0
