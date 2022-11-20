@@ -1,17 +1,15 @@
-import os
-import random
-import sys
-from argparse import SUPPRESS, ArgumentParser
+from argparse import ArgumentParser
 
-import model as model_path
 import numpy as np
 import tensorflow as tf
+
+from models.core import ChoiceNetSimple, TransferModel
 
 
 def get_weight_matrix_input_predict(fine_tune_weights):
     learning_rate = 0.001
     # ======model weight matrxi embedding:
-    base_model = model_path.Model_transfer()
+    base_model = TransferModel()
     checkpoint = tf.train.Checkpoint(base_model)
     checkpoint.restore(fine_tune_weights).expect_partial()
 
@@ -52,7 +50,7 @@ def predict(args):
     print(">>>>your fist", X_test.shape)
     print(">>>>your 2nd X", X_test2.shape)
 
-    model = model_path.Model_ChoiceNet_simple()
+    model = ChoiceNetSimple()
     checkpoint = tf.train.Checkpoint(model)
     checkpoint.restore(choice_net_weights).expect_partial()
 

@@ -1,7 +1,4 @@
 import os
-import random
-import sys
-from argparse import SUPPRESS, ArgumentParser
 
 import numpy as np
 import tensorflow as tf

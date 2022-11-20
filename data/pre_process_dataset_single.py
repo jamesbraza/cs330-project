@@ -1,10 +1,4 @@
-import glob
-import os
-from argparse import SUPPRESS, ArgumentParser
-
-import cv2
 import numpy as np
-from sklearn import preprocessing
 from sklearn.decomposition import PCA
 
 
