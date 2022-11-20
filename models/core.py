@@ -48,7 +48,7 @@ class TransferModel(tf.keras.Model):
         x = self.dropout(x, training=training)
         return self.dense(x)
 
-    def to_fine_tuning(
+    def clone(
         self,
         new_num_classes: int,
         new_dense_weights: Sequence[float] | None = None,

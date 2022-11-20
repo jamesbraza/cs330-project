@@ -37,14 +37,9 @@ def train(args: argparse.Namespace) -> None:
     dataset_config = DATASET_CONFIGS[args.dataset]
 
     seed_nickname = [str(args.seed), args.run_nickname]
-    base_models_dir = os.path.join(MODEL_SAVE_DIR, "base_models", *seed_nickname)
-    tl_models_dir = os.path.join(MODEL_SAVE_DIR, "tl_models", *seed_nickname)
-    ft_models_dir = os.path.join(MODEL_SAVE_DIR, "ft_models", *seed_nickname)
-    tl_log_dir = os.path.join(LOG_DIR, "tl_logs", *seed_nickname)
-    ft_log_dir = os.path.join(LOG_DIR, "ft_logs", *seed_nickname)
 
     # NOTE: these are already batched
-    ft_ds, test_ds, ft_test_labels = get_plant_diseases_datasets(
+    ft_ds, test_ds, plants_labels = get_plant_diseases_datasets(
         num_train_batch=args.ft_num_batches,
         num_val_batch=args.test_num_batches,
         seed=args.seed,
@@ -52,7 +47,7 @@ def train(args: argparse.Namespace) -> None:
         image_size=dataset_config.image_shape[:-1],
     )
     ft_ds, test_ds = (
-        preprocess_standardize(ds, num_classes=len(ft_test_labels))
+        preprocess_standardize(ds, num_classes=len(plants_labels))
         for ds in (ft_ds, test_ds)
     )
 
@@ -61,7 +56,7 @@ def train(args: argparse.Namespace) -> None:
     )
 
     # 1. Save randomly initialized weights to begin training with the same state
-    base_weights_path = os.path.join(base_models_dir)
+    base_weights_path = os.path.join(MODEL_SAVE_DIR, "base_models", *seed_nickname)
     model.save_weights(base_weights_path)
 
     for i, (dataset, labels) in enumerate(
@@ -95,14 +90,23 @@ def train(args: argparse.Namespace) -> None:
             validation_data=val_ds,
             callbacks=[
                 tf.keras.callbacks.TensorBoard(
-                    log_dir=os.path.join(tl_log_dir, labels_name), histogram_freq=1
+                    log_dir=os.path.join(
+                        LOG_DIR, "tl_logs", *seed_nickname, labels_name
+                    ),
+                    histogram_freq=1,
                 )
             ],
         )
-        model.save_weights(os.path.join(tl_models_dir, labels_name))
+        model.save_weights(
+            os.path.join(MODEL_SAVE_DIR, "tl_models", *seed_nickname, labels_name)
+        )
 
         # 4. Prepare for fine-tuning
-        new_model = model.to_fine_tuning(new_num_classes=len(ft_test_labels))
+        # TODO: utilize copying of weights here
+        new_model = model.clone(new_num_classes=len(plants_labels))
+        new_model.layer1.trainable = False
+        new_model.layer2.trainable = False
+
         # NOTE: reset the optimizer before fine-tuning
         new_model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
@@ -116,14 +120,26 @@ def train(args: argparse.Namespace) -> None:
             epochs=args.num_epochs,
             callbacks=[
                 tf.keras.callbacks.TensorBoard(
-                    log_dir=os.path.join(ft_log_dir, labels_name), histogram_freq=1
+                    log_dir=os.path.join(
+                        LOG_DIR, "ft_logs", *seed_nickname, labels_name
+                    ),
+                    histogram_freq=1,
                 )
             ],
         )
-        new_model.save_weights(os.path.join(ft_models_dir, labels_name))
+        new_model.save_weights(
+            os.path.join(MODEL_SAVE_DIR, "ft_models", *seed_nickname, labels_name)
+        )
 
         # 6. Perform predictions on the test dataset
-        preds: np.ndarray = new_model.predict(test_ds).argmax(axis=1)
+        num_all_correct, count = 0, 0
+        for batch_images, batch_labels in test_ds:
+            num_all_correct += np.sum(
+                new_model.predict(batch_images).argmax(axis=1)
+                == tf.argmax(batch_labels, axis=1)
+            )
+            count += batch_labels.shape[0]
+        accuracy = num_all_correct / count
         _ = 0
 
     _ = 0
@@ -159,7 +175,7 @@ def main() -> None:
     parser.add_argument(
         "--tl_num_batches",
         type=int,
-        default=math.ceil(200 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(2000 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in each transfer learning dataset",
     )
     parser.add_argument(
