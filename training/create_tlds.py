@@ -1,10 +1,13 @@
+import argparse
+import math
 import os
-from argparse import ArgumentParser
 
+import numpy as np
 import tensorflow as tf
 
 from data.dataset import (
     DATASET_CONFIGS,
+    DEFAULT_BATCH_SIZE,
     DEFAULT_NUM_CLASSES,
     DEFAULT_NUM_DATASETS,
     DEFAULT_SEED,
@@ -18,7 +21,18 @@ from models.core import TransferModel
 from training import LOG_DIR
 
 
-def train(args) -> None:
+def preprocess_standardize(
+    ds: tf.data.Dataset, num_classes: int, prefetch_size: int = tf.data.AUTOTUNE
+) -> tf.data.Dataset:
+    """Standardize images, convert labels to one-hot vector, and prefetch."""
+    return preprocess(
+        ds,
+        num_classes=num_classes,
+        image_preprocessor=tf.image.per_image_standardization,
+    ).prefetch(prefetch_size)
+
+
+def train(args: argparse.Namespace) -> None:
     tf.random.set_seed(args.seed)
     dataset_config = DATASET_CONFIGS[args.dataset]
 
@@ -29,13 +43,22 @@ def train(args) -> None:
     tl_log_dir = os.path.join(LOG_DIR, "tl_logs", *seed_nickname)
     ft_log_dir = os.path.join(LOG_DIR, "ft_logs", *seed_nickname)
 
-    ft_ds, test_ds, labels = get_plant_diseases_datasets(
-        num_train_ex=args.ft_num_examples,
-        num_val_ex=args.test_num_examples,
+    # NOTE: these are already batched
+    ft_ds, test_ds, ft_test_labels = get_plant_diseases_datasets(
+        num_train_batch=args.ft_num_batches,
+        num_val_batch=args.test_num_batches,
         seed=args.seed,
+        batch_size=args.batch_size,
+        image_size=dataset_config.image_shape[:-1],
+    )
+    ft_ds, test_ds = (
+        preprocess_standardize(ds, num_classes=len(ft_test_labels))
+        for ds in (ft_ds, test_ds)
     )
 
-    model = TransferModel()
+    model = TransferModel(
+        input_shape=dataset_config.image_shape, num_classes=dataset_config.num_classes
+    )
 
     # 1. Save randomly initialized weights to begin training with the same state
     base_weights_path = os.path.join(base_models_dir)
@@ -46,7 +69,8 @@ def train(args) -> None:
             dataset=dataset_config.name,
             num_ds=args.tl_num_datasets,
             num_classes=args.tl_num_classes,
-            num_ex=args.tl_num_examples,
+            batch_size=args.batch_size,
+            num_batches=args.tl_num_batches,
             seed=args.seed,
         )
     ):
@@ -60,20 +84,11 @@ def train(args) -> None:
             metrics=["accuracy"],
         )
 
-        # 3. Prepare datasets for training
-        train_ds, val_ds = split(dataset)
-        train_ds = (
-            preprocess(train_ds, num_classes=dataset_config.num_classes)
-            .batch(args.batch_size)
-            .prefetch(tf.data.AUTOTUNE)
+        # 3. Perform the transfer learning
+        train_ds, val_ds = (
+            preprocess_standardize(ds, num_classes=dataset_config.num_classes)
+            for ds in split(dataset)
         )
-        val_ds = (
-            preprocess(val_ds, num_classes=dataset_config.num_classes)
-            .batch(args.batch_size)
-            .prefetch(tf.data.AUTOTUNE)
-        )
-
-        # 4. Perform the transfer learning
         model.fit(
             train_ds,
             epochs=args.num_epochs,
@@ -86,14 +101,17 @@ def train(args) -> None:
         )
         model.save_weights(os.path.join(tl_models_dir, labels_name))
 
-        # 5. Perform the fine tuning
-        # Reset the optimizer
-        model.compile(
+        # 4. Prepare for fine-tuning
+        new_model = model.to_fine_tuning(new_num_classes=len(ft_test_labels))
+        # NOTE: reset the optimizer before fine-tuning
+        new_model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
             loss="categorical_crossentropy",
             metrics=["accuracy"],
         )
-        model.fit(
+
+        # 5. Perform the fine-tuning
+        new_model.fit(
             ft_ds,
             epochs=args.num_epochs,
             callbacks=[
@@ -102,18 +120,26 @@ def train(args) -> None:
                 )
             ],
         )
-        model.save_weights(os.path.join(ft_models_dir, labels_name))
+        new_model.save_weights(os.path.join(ft_models_dir, labels_name))
 
+        # 6. Perform predictions on the test dataset
+        preds: np.ndarray = new_model.predict(test_ds).argmax(axis=1)
         _ = 0
-        model.predict()
 
     _ = 0
 
 
 def main() -> None:
-    parser = ArgumentParser(description="Create the transfer-learning dataset")
+    parser = argparse.ArgumentParser(description="Create the transfer-learning dataset")
     parser.add_argument(
         "-s", "--seed", type=int, default=DEFAULT_SEED, help="random seed"
+    )
+    parser.add_argument(
+        "-b",
+        "--batch_size",
+        type=int,
+        default=DEFAULT_BATCH_SIZE,
+        help="batch size during transfer learning, fine tuning, and prediction",
     )
     parser.add_argument(
         "-d", "--dataset", type=str, default="cifar100", help="source dataset name"
@@ -131,25 +157,22 @@ def main() -> None:
         help="number of classes to have in each transfer learning dataset",
     )
     parser.add_argument(
-        "--tl_num_examples",
+        "--tl_num_batches",
         type=int,
-        default=200,
-        help="number of examples to have in each transfer learning dataset",
+        default=math.ceil(200 / DEFAULT_BATCH_SIZE),
+        help="number of batches to have in each transfer learning dataset",
     )
     parser.add_argument(
-        "--ft_num_examples",
+        "--ft_num_batches",
         type=int,
-        default=200,
-        help="number of examples to have in the fine tuning dataset",
+        default=math.ceil(200 / DEFAULT_BATCH_SIZE),
+        help="number of batches to have in the fine tuning dataset",
     )
     parser.add_argument(
-        "--test_num_examples",
+        "--test_num_batches",
         type=int,
-        default=200,
-        help="number of examples to have in the test dataset",
-    )
-    parser.add_argument(
-        "-b", "--batch_size", type=int, default=32, help="learning rate"
+        default=math.ceil(200 / DEFAULT_BATCH_SIZE),
+        help="number of batches to have in the test dataset",
     )
     parser.add_argument(
         "--learning_rate", type=float, default=1e-3, help="learning rate"
