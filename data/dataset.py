@@ -137,20 +137,16 @@ def get_plant_diseases_datasets(
             with string labels.
     """
     from_dir_kwargs = {"seed": seed, "validation_split": 0.1} | from_dir_kwargs
-    train_ds = tf.keras.utils.image_dataset_from_directory(
-        PLANT_DISEASES_TRAIN, subset="training", **from_dir_kwargs
+    train_ds, val_ds = tf.keras.utils.image_dataset_from_directory(
+        PLANT_DISEASES_TRAIN, subset="both", **from_dir_kwargs
     )
     # NOTE: indices correspond with ID, values correspond with string
     labels: list[PlantLabel] = [
         PlantLabel(raw_label, *raw_label.split("___"))
-        for raw_label in train_ds.class_names
+        for raw_label in set().union(train_ds.class_names, val_ds.class_names)
     ]
     # NOTE: .take() wipes away the ephemeral class_names attribute
-    train_ds = train_ds.take(num_train_batch)
-    val_ds = tf.keras.utils.image_dataset_from_directory(
-        PLANT_DISEASES_TRAIN, subset="validation", **from_dir_kwargs
-    ).take(num_val_batch)
-    return train_ds, val_ds, labels
+    return train_ds.take(num_train_batch), val_ds.take(num_val_batch), labels
 
 
 def split(
