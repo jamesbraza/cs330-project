@@ -46,9 +46,6 @@ def train(args: argparse.Namespace) -> None:
         batch_size=args.batch_size,
         image_size=dataset_config.image_shape[:-1],
     )
-    test_labels = np.array(
-        [label.numpy() for batch in test_ds for label in batch[1]], dtype=int
-    )
     ft_ds, test_ds = (
         preprocess_standardize(ds, num_classes=len(plants_labels))
         for ds in (ft_ds, test_ds)
@@ -105,7 +102,11 @@ def train(args: argparse.Namespace) -> None:
         )
 
         # 4. Prepare for fine-tuning
-        new_model = model.to_fine_tuning(new_num_classes=len(plants_labels))
+        # TODO: utilize copying of weights here
+        new_model = model.clone(new_num_classes=len(plants_labels))
+        new_model.layer1.trainable = False
+        new_model.layer2.trainable = False
+
         # NOTE: reset the optimizer before fine-tuning
         new_model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
@@ -131,8 +132,14 @@ def train(args: argparse.Namespace) -> None:
         )
 
         # 6. Perform predictions on the test dataset
-        preds: np.ndarray = new_model.predict(test_ds).argmax(axis=1)
-        accuracy = np.mean(preds == test_labels)
+        num_all_correct, count = 0, 0
+        for batch_images, batch_labels in test_ds:
+            num_all_correct += np.sum(
+                new_model.predict(batch_images).argmax(axis=1)
+                == tf.argmax(batch_labels, axis=1)
+            )
+            count += batch_labels.shape[0]
+        accuracy = num_all_correct / count
         _ = 0
 
     _ = 0
@@ -168,7 +175,7 @@ def main() -> None:
     parser.add_argument(
         "--tl_num_batches",
         type=int,
-        default=math.ceil(200 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(2000 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in each transfer learning dataset",
     )
     parser.add_argument(
