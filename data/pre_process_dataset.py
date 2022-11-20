@@ -1,17 +1,16 @@
 import glob
-import os.path
+import os
 
 import numpy as np
 from sklearn.decomposition import PCA
 
 
-def pca_dataset(path_dir) -> None:
-    data_path = glob.glob(os.path.join(path_dir, "*.npy"))
+def pca_dataset(path_dir: str) -> None:
+    matching_paths = glob.glob(os.path.join(path_dir, "*.npy"))
 
-    print(data_path)
+    print(matching_paths)
     all_data_list = []
-    for i in data_path:
-        data_path = i
+    for data_path in matching_paths:
         data_matrix = np.load(data_path)
 
         # ====fill in nan
@@ -22,12 +21,12 @@ def pca_dataset(path_dir) -> None:
         pca.fit(x1)
         x_reduce = pca.transform(x1)
         x_average = np.average(x_reduce, axis=0)
-
         all_data_list.append(x_average)
+
     all_data_np = np.array(all_data_list)
-    np.save(path_dir, all_data_np)
+    np.save(os.path.join(path_dir, "data.npy"), all_data_np)
     print(">>>>>your reduced feature input", all_data_np.shape)
 
 
 if __name__ == "__main__":
-    pca_dataset(path_dir="/Users/annaning/Desktop/cs330/project/data/x_feature")
+    pca_dataset(path_dir=os.path.dirname(__file__))
