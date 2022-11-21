@@ -1,4 +1,5 @@
 import argparse
+import csv
 import math
 import os
 
@@ -17,7 +18,9 @@ from data.dataset import (
 )
 from models import MODEL_SAVE_DIR
 from models.core import TransferModel
-from training import LOG_DIR
+from training import LOG_DIR, TRAINING_DIR
+
+DEFAULT_CSV_SUMMARY = os.path.join(TRAINING_DIR, "tlds_summary.csv")
 
 
 def preprocess_standardize(
@@ -36,6 +39,19 @@ def train(args: argparse.Namespace) -> None:
     dataset_config = DATASET_CONFIGS[args.dataset]
 
     seed_nickname = [str(args.seed), args.run_nickname]
+    summary_fields = args.dataset, args.batch_size, args.tl_num_batches, *seed_nickname
+    with open(args.tlds_csv_summary, mode="w", encoding="utf-8") as f:
+        csv.writer(f).writerow(
+            [
+                "dataset",
+                "batch_size",
+                "num_batches",
+                "seed",
+                "nickname",
+                "labels",
+                "accuracy",
+            ]
+        )
 
     # NOTE: these are already batched
     ft_ds, test_ds, plants_labels = get_plant_diseases_datasets(
@@ -53,10 +69,16 @@ def train(args: argparse.Namespace) -> None:
     model = TransferModel(
         input_shape=dataset_config.image_shape, num_classes=dataset_config.num_classes
     )
+    # Build to populate weights for Checkpoint
+    model.build(input_shape=model.input_layer.input_shape[0])
 
     # 1. Save randomly initialized weights to begin training with the same state
-    base_weights_path = os.path.join(MODEL_SAVE_DIR, "base_models", *seed_nickname)
-    model.save_weights(base_weights_path)
+
+    random_init_path = os.path.join(MODEL_SAVE_DIR, "base_models", *seed_nickname)
+    random_init_checkpoint = tf.train.Checkpoint(model)
+    if not os.path.exists(f"{random_init_path}-1.index"):
+        saved_path = random_init_checkpoint.save(random_init_path)
+        assert saved_path == f"{random_init_path}-1"
 
     for i, (dataset, labels) in enumerate(
         get_random_datasets(
@@ -71,7 +93,7 @@ def train(args: argparse.Namespace) -> None:
         labels_name = str(list(labels)).replace(" ", "")
 
         # 2. Load randomly initialized weights
-        model.load_weights(base_weights_path)
+        random_init_checkpoint.restore(f"{random_init_path}-1")
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
             loss="categorical_crossentropy",
@@ -96,6 +118,7 @@ def train(args: argparse.Namespace) -> None:
                 )
             ],
         )
+        # Save the TL model as part of the transfer learning dataset
         model.save_weights(
             os.path.join(MODEL_SAVE_DIR, "tl_models", *seed_nickname, labels_name)
         )
@@ -126,15 +149,13 @@ def train(args: argparse.Namespace) -> None:
                 )
             ],
         )
-        new_model.save_weights(
-            os.path.join(MODEL_SAVE_DIR, "ft_models", *seed_nickname, labels_name)
-        )
 
         # 6. Perform predictions on the test dataset
         loss, accuracy = new_model.evaluate(test_ds)
-        _ = 0
+        with open(args.tlds_csv_summary, mode="a", encoding="utf-8") as f:
+            csv.writer(f).writerow([*summary_fields, labels_name, accuracy])
 
-    _ = 0
+    _ = 0  # Debug here
 
 
 def main() -> None:
@@ -189,14 +210,17 @@ def main() -> None:
     parser.add_argument(
         "--run_nickname",
         type=str,
-        default="",
+        default="foo",
         help="nickname for saving logs/models",
     )
     parser.add_argument(
-        "--log_dir",
+        "--log_dir", type=str, default=LOG_DIR, help="log base directory"
+    )
+    parser.add_argument(
+        "--tlds_csv_summary",
         type=str,
-        default=LOG_DIR,
-        help="log base directory",
+        default=DEFAULT_CSV_SUMMARY,
+        help="transfer learning dataset summary CSV file location",
     )
     train(parser.parse_args())
 
