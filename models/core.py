@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import tempfile
 from collections.abc import Sequence
 
@@ -22,6 +23,10 @@ class Conv2D(tf.keras.Model):
 
 
 class TransferModel(tf.keras.Model):
+
+    LAYER_3_NUM_FILTERS = 128
+    LAYER_3_KERNEL_SIZE = (3, 3)
+
     def __init__(self, input_shape: Shape = (28, 28, 3), num_classes: int = 10):
         super().__init__()
         # Include input_layer so we can infer input shape for copy
@@ -31,7 +36,10 @@ class TransferModel(tf.keras.Model):
             filters=128, kernel_size=(3, 3), strides=2, padding="valid"
         )
         self.layer3 = Conv2D(
-            filters=128, kernel_size=(3, 3), strides=2, padding="valid"
+            filters=self.LAYER_3_NUM_FILTERS,
+            kernel_size=self.LAYER_3_KERNEL_SIZE,
+            strides=2,
+            padding="valid",
         )
         self.pooling = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))
         self.flatten = tf.keras.layers.Flatten()
@@ -93,7 +101,13 @@ class ReduceMatrix(tf.keras.Model):
 class ChoiceNetSimple(tf.keras.Model):
     def __init__(self):
         super().__init__()
-        self.layer_reduce = ReduceMatrix(conv_filter_dim=128 * 3 * 3, reduced_dim=16)
+        self.layer_reduce = ReduceMatrix(
+            conv_filter_dim=(
+                TransferModel.LAYER_3_NUM_FILTERS
+                * math.prod(TransferModel.LAYER_3_KERNEL_SIZE)
+            ),
+            reduced_dim=16,
+        )
         self.flat = self.flatten = tf.keras.layers.Flatten()
         self.layer1 = tf.keras.layers.Dense(units=128, activation="relu")
         self.dropout = tf.keras.layers.Dropout(rate=0.3)
