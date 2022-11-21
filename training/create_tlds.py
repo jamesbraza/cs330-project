@@ -39,8 +39,19 @@ def train(args: argparse.Namespace) -> None:
     dataset_config = DATASET_CONFIGS[args.dataset]
 
     seed_nickname = [str(args.seed), args.run_nickname]
+    summary_fields = args.dataset, args.batch_size, args.tl_num_batches, *seed_nickname
     with open(args.tlds_csv_summary, mode="w", encoding="utf-8") as f:
-        csv.writer(f).writerow(["seed", "nickname", "labels", "loss", "accuracy"])
+        csv.writer(f).writerow(
+            [
+                "dataset",
+                "batch_size",
+                "num_batches",
+                "seed",
+                "nickname",
+                "labels",
+                "accuracy",
+            ]
+        )
 
     # NOTE: these are already batched
     ft_ds, test_ds, plants_labels = get_plant_diseases_datasets(
@@ -141,8 +152,8 @@ def train(args: argparse.Namespace) -> None:
 
         # 6. Perform predictions on the test dataset
         loss, accuracy = new_model.evaluate(test_ds)
-        with open(args.tlds_csv_summary, mode="w", encoding="utf-8") as f:
-            csv.writer(f).writerow([*seed_nickname, labels_name, loss, accuracy])
+        with open(args.tlds_csv_summary, mode="a", encoding="utf-8") as f:
+            csv.writer(f).writerow([*summary_fields, labels_name, accuracy])
 
     _ = 0  # Debug here
 
