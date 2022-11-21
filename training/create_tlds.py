@@ -90,6 +90,8 @@ def train(args: argparse.Namespace) -> None:
         )
     ):
         labels_name = str(list(labels)).replace(" ", "")
+        # Keras can't handle [] per https://github.com/keras-team/keras/issues/17265
+        labels_path = labels_name[1:-1]
 
         # 2. Load randomly initialized weights
         random_init_checkpoint.restore(f"{random_init_path}-1")
@@ -111,7 +113,7 @@ def train(args: argparse.Namespace) -> None:
             callbacks=[
                 tf.keras.callbacks.TensorBoard(
                     log_dir=os.path.join(
-                        LOG_DIR, "tl_logs", *seed_nickname, labels_name
+                        LOG_DIR, "tl_logs", *seed_nickname, labels_path
                     ),
                     histogram_freq=1,
                 )
@@ -119,7 +121,7 @@ def train(args: argparse.Namespace) -> None:
         )
         # Save the TL model as part of the transfer learning dataset
         model.save_weights(
-            os.path.join(MODEL_SAVE_DIR, "tl_models", *seed_nickname, labels_name)
+            os.path.join(MODEL_SAVE_DIR, "tl_models", *seed_nickname, labels_path)
         )
 
         # 4. Prepare for fine-tuning
@@ -142,7 +144,7 @@ def train(args: argparse.Namespace) -> None:
             callbacks=[
                 tf.keras.callbacks.TensorBoard(
                     log_dir=os.path.join(
-                        LOG_DIR, "ft_logs", *seed_nickname, labels_name
+                        LOG_DIR, "ft_logs", *seed_nickname, labels_path
                     ),
                     histogram_freq=1,
                 )
