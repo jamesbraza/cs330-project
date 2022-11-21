@@ -8,7 +8,7 @@ from models.core import TransferModel
 learning_rate = 0.001
 
 
-def get_weight_matrix_input(fine_tune_weights_list):
+def get_weight_matrix_input(fine_tune_weights_list: list[str]):
     weigth_matrix = []
     for fine_tune_weights in fine_tune_weights_list:
         print(fine_tune_weights)
@@ -52,11 +52,7 @@ def get_weight_matrix_input(fine_tune_weights_list):
 
 
 if __name__ == "__main__":
-    # path="/data1/cs330/project/weight_matrix"
-    # folder_name=os.listdir(path)
-    # dir_list=[os.path.join(path,f) for f in folder_name]
-    # dir_list=['/data1/cs330/project/weight_matrix/model2', '/data1/cs330/project/weight_matrix/model3', '/data1/cs330/project/weight_matrix/model4', '/data1/cs330/project/weight_matrix/model5', '/data1/cs330/project/weight_matrix/model6', '/data1/cs330/project/weight_matrix/model7', '/data1/cs330/project/weight_matrix/model8']
     dir_list = ["/data1/cs330/project/weight_matrix/model8"]
     path = "/data1/cs330/project/data/x_feature_test"
-    weigth_matrix_np = get_weight_matrix_input(dir_list)
-    np.save(os.path.join(path, "weight_training_matrix_model8.npy"), weigth_matrix_np)
+    weight_matrix = get_weight_matrix_input(dir_list)
+    np.save(os.path.join(path, "weight_training_matrix_model8.npy"), weight_matrix)

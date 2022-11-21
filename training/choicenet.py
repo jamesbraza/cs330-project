@@ -68,16 +68,13 @@ def train_model(args):
         log_dir + "training.csv", separator=","
     )
 
-    train_model = model.fit(
+    model.fit(
         X_train,
         Y_train,
         epochs=max_epoch,
         batch_size=batch_size,
         validation_data=(X_val, Y_val),
-        callbacks=[
-            model_save_callback,
-            train_log_callback,
-        ],
+        callbacks=[model_save_callback, train_log_callback],
         verbose=1,
         shuffle=True,
     )

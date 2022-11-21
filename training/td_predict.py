@@ -6,7 +6,7 @@ import tensorflow as tf
 from models.core import ChoiceNetSimple, TransferModel
 
 
-def get_weight_matrix_input_predict(fine_tune_weights):
+def get_weight_matrix_input_predict(fine_tune_weights: str):
     learning_rate = 0.001
     # ======model weight matrxi embedding:
     base_model = TransferModel()

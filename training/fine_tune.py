@@ -59,17 +59,13 @@ def train_model(args):
         log_dir=log_dir, histogram_freq=1
     )
 
-    train_model = new_model.fit(
+    new_model.fit(
         X_train,
         Y_train,
         epochs=max_epoch,
         batch_size=batch_size,
         validation_data=(X_val, Y_val),
-        callbacks=[
-            model_save_callback,
-            train_log_callback,
-            tensorboard_callback,
-        ],
+        callbacks=[model_save_callback, train_log_callback, tensorboard_callback],
         verbose=1,
         shuffle=True,
     )
