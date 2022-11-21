@@ -1,22 +1,20 @@
-import os
-import random
-import sys
-from argparse import SUPPRESS, ArgumentParser
+from argparse import ArgumentParser
 
-import model as model_path
 import numpy as np
 import tensorflow as tf
+
+from models.core import ChoiceNetSimple, TransferModel
 
 learning_rate = 0.001
 
 
-def get_weight_matrix_input(fine_tune_weights_list):
+def get_weight_matrix_input(fine_tune_weights_list: list[str]):
     weigth_matrix = []
     for fine_tune_weights in fine_tune_weights_list:
         print(fine_tune_weights)
 
         # ======model weight matrxi embedding:
-        base_model = model_path.Model_transfer()
+        base_model = TransferModel()
         checkpoint = tf.train.Checkpoint(base_model)
         checkpoint.restore(fine_tune_weights).expect_partial()
 
@@ -44,7 +42,6 @@ def get_weight_matrix_input(fine_tune_weights_list):
 
 
 def train_model(args):
-    learning_rate = args.learning_rate
     max_epoch = args.maxEpoch
     batch_size = args.batch_size
     weight_matrix_path = args.weight_matrix_path
@@ -67,9 +64,9 @@ def train_model(args):
     Y_val = Y_matrix[-1:]
     X_val2 = X_input2[-1:]
 
-    model = model_path.Model_ChoiceNet_simple()
+    model = ChoiceNetSimple()
 
-    opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    opt = tf.keras.optimizers.Adam(learning_rate=args.learning_rate)
     model.compile(
         optimizer=opt, loss="mse", metrics=[tf.keras.metrics.MeanSquaredError()]
     )
@@ -87,16 +84,13 @@ def train_model(args):
         log_dir=log_dir, histogram_freq=1
     )
 
-    train_model = model.fit(
+    model.fit(
         [X_train, X_train2],
         Y_train,
         epochs=max_epoch,
         batch_size=1,
         validation_data=([X_val, X_val2], Y_val),
-        callbacks=[
-            model_save_callback,
-            train_log_callback,
-        ],
+        callbacks=[model_save_callback, train_log_callback],
         verbose=1,
         shuffle=True,
     )
