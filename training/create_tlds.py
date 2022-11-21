@@ -53,10 +53,15 @@ def train(args: argparse.Namespace) -> None:
     model = TransferModel(
         input_shape=dataset_config.image_shape, num_classes=dataset_config.num_classes
     )
+    # Build to populate weights for Checkpoint
+    model.build(input_shape=model.input_layer.input_shape[0])
 
     # 1. Save randomly initialized weights to begin training with the same state
-    base_weights_path = os.path.join(MODEL_SAVE_DIR, "base_models", *seed_nickname)
-    model.save_weights(base_weights_path)
+    random_init_path = os.path.join(MODEL_SAVE_DIR, "base_models", *seed_nickname)
+    random_init_checkpoint = tf.train.Checkpoint(model)
+    if not os.path.exists(f"{random_init_path}-1.index"):
+        saved_path = random_init_checkpoint.save(random_init_path)
+        assert saved_path == f"{random_init_path}-1"
 
     for i, (dataset, labels) in enumerate(
         get_random_datasets(
@@ -71,7 +76,7 @@ def train(args: argparse.Namespace) -> None:
         labels_name = str(list(labels)).replace(" ", "")
 
         # 2. Load randomly initialized weights
-        model.load_weights(base_weights_path)
+        random_init_checkpoint.restore(f"{random_init_path}-1")
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
             loss="categorical_crossentropy",
@@ -96,6 +101,7 @@ def train(args: argparse.Namespace) -> None:
                 )
             ],
         )
+        # Save the TL model as part of the transfer learning dataset
         model.save_weights(
             os.path.join(MODEL_SAVE_DIR, "tl_models", *seed_nickname, labels_name)
         )
@@ -125,9 +131,6 @@ def train(args: argparse.Namespace) -> None:
                     histogram_freq=1,
                 )
             ],
-        )
-        new_model.save_weights(
-            os.path.join(MODEL_SAVE_DIR, "ft_models", *seed_nickname, labels_name)
         )
 
         # 6. Perform predictions on the test dataset
@@ -189,7 +192,7 @@ def main() -> None:
     parser.add_argument(
         "--run_nickname",
         type=str,
-        default="",
+        default="foo",
         help="nickname for saving logs/models",
     )
     parser.add_argument(
