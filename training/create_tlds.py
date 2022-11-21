@@ -73,7 +73,6 @@ def train(args: argparse.Namespace) -> None:
     model.build(input_shape=model.input_layer.input_shape[0])
 
     # 1. Save randomly initialized weights to begin training with the same state
-
     random_init_path = os.path.join(MODEL_SAVE_DIR, "base_models", *seed_nickname)
     random_init_checkpoint = tf.train.Checkpoint(model)
     if not os.path.exists(f"{random_init_path}-1.index"):
@@ -95,7 +94,7 @@ def train(args: argparse.Namespace) -> None:
         # 2. Load randomly initialized weights
         random_init_checkpoint.restore(f"{random_init_path}-1")
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=args.tl_learning_rate),
             loss="categorical_crossentropy",
             metrics=["accuracy"],
         )
@@ -131,7 +130,7 @@ def train(args: argparse.Namespace) -> None:
 
         # NOTE: reset the optimizer before fine-tuning
         new_model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=args.ft_learning_rate),
             loss="categorical_crossentropy",
             metrics=["accuracy"],
         )
@@ -192,19 +191,28 @@ def main() -> None:
         help="number of batches to have in each transfer learning dataset",
     )
     parser.add_argument(
+        "--tl_learning_rate",
+        type=float,
+        default=1e-3,
+        help="learning rate for transfer learning",
+    )
+    parser.add_argument(
         "--ft_num_batches",
         type=int,
         default=math.ceil(1000 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in the fine tuning dataset",
     )
     parser.add_argument(
+        "--ft_learning_rate",
+        type=float,
+        default=1e-4,
+        help="learning rate for fine-tuning",
+    )
+    parser.add_argument(
         "--test_num_batches",
         type=int,
         default=math.ceil(200 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in the test dataset",
-    )
-    parser.add_argument(
-        "--learning_rate", type=float, default=1e-3, help="learning rate"
     )
     parser.add_argument("--num_epochs", type=int, default=15, help="number of epochs")
     parser.add_argument(
