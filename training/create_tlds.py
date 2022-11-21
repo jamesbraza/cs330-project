@@ -1,4 +1,5 @@
 import argparse
+import csv
 import math
 import os
 
@@ -17,7 +18,9 @@ from data.dataset import (
 )
 from models import MODEL_SAVE_DIR
 from models.core import TransferModel
-from training import LOG_DIR
+from training import LOG_DIR, TRAINING_DIR
+
+DEFAULT_CSV_SUMMARY = os.path.join(TRAINING_DIR, "tlds_summary.csv")
 
 
 def preprocess_standardize(
@@ -36,6 +39,8 @@ def train(args: argparse.Namespace) -> None:
     dataset_config = DATASET_CONFIGS[args.dataset]
 
     seed_nickname = [str(args.seed), args.run_nickname]
+    with open(args.tlds_csv_summary, mode="w", encoding="utf-8") as f:
+        csv.writer(f).writerow(["seed", "nickname", "labels", "loss", "accuracy"])
 
     # NOTE: these are already batched
     ft_ds, test_ds, plants_labels = get_plant_diseases_datasets(
@@ -57,6 +62,7 @@ def train(args: argparse.Namespace) -> None:
     model.build(input_shape=model.input_layer.input_shape[0])
 
     # 1. Save randomly initialized weights to begin training with the same state
+
     random_init_path = os.path.join(MODEL_SAVE_DIR, "base_models", *seed_nickname)
     random_init_checkpoint = tf.train.Checkpoint(model)
     if not os.path.exists(f"{random_init_path}-1.index"):
@@ -135,9 +141,10 @@ def train(args: argparse.Namespace) -> None:
 
         # 6. Perform predictions on the test dataset
         loss, accuracy = new_model.evaluate(test_ds)
-        _ = 0
+        with open(args.tlds_csv_summary, mode="w", encoding="utf-8") as f:
+            csv.writer(f).writerow([*seed_nickname, labels_name, loss, accuracy])
 
-    _ = 0
+    _ = 0  # Debug here
 
 
 def main() -> None:
@@ -196,10 +203,13 @@ def main() -> None:
         help="nickname for saving logs/models",
     )
     parser.add_argument(
-        "--log_dir",
+        "--log_dir", type=str, default=LOG_DIR, help="log base directory"
+    )
+    parser.add_argument(
+        "--tlds_csv_summary",
         type=str,
-        default=LOG_DIR,
-        help="log base directory",
+        default=DEFAULT_CSV_SUMMARY,
+        help="transfer learning dataset summary CSV file location",
     )
     train(parser.parse_args())
 
