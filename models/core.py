@@ -24,22 +24,23 @@ class Conv2D(tf.keras.Model):
 
 class TransferModel(tf.keras.Model):
 
+    LAYER_1_NUM_FILTERS = 64
+    LAYER_2_NUM_FILTERS = 128
     LAYER_3_NUM_FILTERS = 128
-    LAYER_3_KERNEL_SIZE = (3, 3)
+    KERNEL_SIZE = (3, 3)
 
     def __init__(self, input_shape: Shape = (28, 28, 3), num_classes: int = 10):
         super().__init__()
         # Include input_layer so we can infer input shape for copy
         self.input_layer = tf.keras.layers.InputLayer(input_shape)
-        self.layer1 = Conv2D(filters=64, kernel_size=(3, 3), strides=2, padding="valid")
+        self.layer1 = Conv2D(
+            filters=self.LAYER_1_NUM_FILTERS, kernel_size=self.KERNEL_SIZE, strides=2
+        )
         self.layer2 = Conv2D(
-            filters=128, kernel_size=(3, 3), strides=2, padding="valid"
+            filters=self.LAYER_2_NUM_FILTERS, kernel_size=self.KERNEL_SIZE, strides=2
         )
         self.layer3 = Conv2D(
-            filters=self.LAYER_3_NUM_FILTERS,
-            kernel_size=self.LAYER_3_KERNEL_SIZE,
-            strides=2,
-            padding="valid",
+            filters=self.LAYER_3_NUM_FILTERS, kernel_size=self.KERNEL_SIZE, strides=2
         )
         self.pooling = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))
         self.flatten = tf.keras.layers.Flatten()
@@ -99,14 +100,14 @@ class ReduceMatrix(tf.keras.Model):
 
 
 class ChoiceNetSimple(tf.keras.Model):
+    REDUCE_FILTER_DIM = TransferModel.LAYER_3_NUM_FILTERS * math.prod(
+        TransferModel.KERNEL_SIZE
+    )
+
     def __init__(self):
         super().__init__()
         self.layer_reduce = ReduceMatrix(
-            conv_filter_dim=(
-                TransferModel.LAYER_3_NUM_FILTERS
-                * math.prod(TransferModel.LAYER_3_KERNEL_SIZE)
-            ),
-            reduced_dim=16,
+            conv_filter_dim=self.REDUCE_FILTER_DIM, reduced_dim=16
         )
         self.flat = self.flatten = tf.keras.layers.Flatten()
         self.layer1 = tf.keras.layers.Dense(units=128, activation="relu")
@@ -114,10 +115,10 @@ class ChoiceNetSimple(tf.keras.Model):
         self.dense = tf.keras.layers.Dense(units=1)
 
     def call(self, inputs, training=None, mask=None):
-        tl_weights, ft_weights = inputs
-        x = self.layer_reduce(tl_weights)
+        tl_model_weights, ft_dataset_weights = inputs
+        x = self.layer_reduce(tl_model_weights)
         x = self.flat(x)
-        concat = tf.concat([x, ft_weights], axis=1)
+        concat = tf.concat([x, ft_dataset_weights], axis=1)
         x = self.layer1(concat)
         x = self.dropout(x, training=training)
         return self.dense(x)

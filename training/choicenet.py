@@ -4,35 +4,9 @@ from argparse import ArgumentParser
 import numpy as np
 import tensorflow as tf
 
-from models.core import ChoiceNetSimple, TransferModel
+from embedding.td_pre_process_weight import get_weight_matrix_input
+from models.core import ChoiceNetSimple
 from training import LOG_DIR
-
-
-def get_weight_matrix_input(fine_tune_weights_list, learning_rate: float):
-    weigth_matrix = []
-    for fine_tune_weights in fine_tune_weights_list:
-        print(fine_tune_weights)
-
-        # ======model weight matrix embedding:
-        base_model = TransferModel()
-        checkpoint = tf.train.Checkpoint(base_model)
-        checkpoint.restore(fine_tune_weights).expect_partial()
-
-        opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        base_model.compile(
-            optimizer=opt,
-            loss="categorical_crossentropy",
-            metrics=["categorical_accuracy"],
-        )
-        base_model.build(input_shape=(None, 28, 28, 3))
-
-        # ======just use last conv layer
-        for layer in base_model.layers[2:3]:
-            weights = layer.get_weights()[0]
-            weigth_np = np.array(weights, dtype=object)
-            weigth_np_flat = weigth_np.flatten()
-            weigth_matrix.append(weigth_np_flat)
-    return np.array(weigth_matrix, dtype="float32")
 
 
 def train_model(args):

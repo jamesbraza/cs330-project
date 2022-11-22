@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 import numpy as np
 import tensorflow as tf
 
+from embedding.embed import embed_model
 from models.core import ChoiceNetSimple, TransferModel
 
 
@@ -20,20 +21,7 @@ def get_weight_matrix_input_predict(fine_tune_weights: str):
     base_model.build(input_shape=(None, 28, 28, 3))
 
     # ======just use last conv layer
-    for layer in base_model.layers[2:3]:
-        weights = layer.get_weights()[0]
-        weigth_np = np.array(weights, dtype=object)
-        print(weigth_np.shape)
-        weigth_np_b = np.swapaxes(weigth_np, 3, 0)
-        print(weigth_np_b.shape)
-        weigth_np_r = np.reshape(
-            weigth_np_b,
-            (
-                weigth_np_b.shape[0],
-                weigth_np_b.shape[1] * weigth_np_b.shape[2] * weigth_np_b.shape[3],
-            ),
-        )
-        print(weigth_np_r.shape)
+    weigth_np_r = embed_model(base_model)
     weigth_np_r = np.expand_dims(weigth_np_r, axis=0).astype("float32")
     print(">>>>>final shape", weigth_np_r.shape)
     return weigth_np_r
