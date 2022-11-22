@@ -6,6 +6,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
+from data import DATA_DIR
+
 Shape: TypeAlias = Sequence[int | None]
 
 
@@ -99,10 +101,8 @@ def get_dataset_subset(
 TRAIN_VAL_BASE_REL_PATH = "plant-diseases/New Plant Diseases Dataset(Augmented)/New Plant Diseases Dataset(Augmented)"
 TRAIN_REL_PATH_PARTICLES: list[str] = [*TRAIN_VAL_BASE_REL_PATH.split("/"), "train"]
 VAL_REL_PATH_PARTICLES: list[str] = [*TRAIN_VAL_BASE_REL_PATH.split("/"), "valid"]
-PLANT_DISEASES_TRAIN = os.path.join(
-    os.path.dirname(__file__), *TRAIN_REL_PATH_PARTICLES
-)
-PLANT_DISEASES_VAL = os.path.join(os.path.dirname(__file__), *VAL_REL_PATH_PARTICLES)
+PLANT_DISEASES_TRAIN = os.path.join(DATA_DIR, *TRAIN_REL_PATH_PARTICLES)
+PLANT_DISEASES_VAL = os.path.join(DATA_DIR, *VAL_REL_PATH_PARTICLES)
 
 
 class PlantLabel(NamedTuple):
