@@ -21,6 +21,7 @@ from models.core import TransferModel
 from training import LOG_DIR, TRAINING_DIR
 
 DEFAULT_CSV_SUMMARY = os.path.join(TRAINING_DIR, "tlds_summary.csv")
+TL_MODELS_SAVE_DIR = os.path.join(MODEL_SAVE_DIR, "tl_models")
 
 
 def preprocess_standardize(
@@ -121,7 +122,7 @@ def train(args: argparse.Namespace) -> None:
         )
         # Save the TL model as part of the transfer learning dataset
         model.save_weights(
-            os.path.join(MODEL_SAVE_DIR, "tl_models", *seed_nickname, labels_path)
+            os.path.join(TL_MODELS_SAVE_DIR, *seed_nickname, labels_path)
         )
 
         # 4. Prepare for fine-tuning
