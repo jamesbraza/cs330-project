@@ -6,13 +6,12 @@ import tensorflow as tf
 from embedding.embed import embed_model
 from models.core import TransferModel
 
-learning_rate = 0.001
 
-
-def get_weight_matrix_input(fine_tune_weights_list: list[str]) -> np.ndarray:
+def get_weight_matrix_input(
+    fine_tune_weights_list: list[str], learning_rate: float = 0.001
+) -> np.ndarray:
     weigth_matrix = []
     for fine_tune_weights in fine_tune_weights_list:
-        print(fine_tune_weights)
         # ======model weight matrix embedding:
         base_model = TransferModel()
         checkpoint = tf.train.Checkpoint(base_model)
@@ -23,13 +22,12 @@ def get_weight_matrix_input(fine_tune_weights_list: list[str]) -> np.ndarray:
             loss="categorical_crossentropy",
             metrics=["categorical_accuracy"],
         )
-        base_model.build(input_shape=(1, 28, 28, 3))
+        base_model.build(input_shape=(None, 28, 28, 3))
 
         weigth_np_r = embed_model(base_model)
         weigth_matrix.append(weigth_np_r)
-    weigth_matrix_np = np.array(weigth_matrix, dtype=object).astype("float32")
-    print(">>>>>final shape", weigth_matrix_np.shape)
-    return weigth_matrix_np
+
+    return np.array(weigth_matrix, dtype="float32")
 
 
 if __name__ == "__main__":
