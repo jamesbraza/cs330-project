@@ -109,7 +109,7 @@ class ChoiceNetSimple(tf.keras.Model):
         self.layer_reduce = ReduceMatrix(
             conv_filter_dim=self.REDUCE_FILTER_DIM, reduced_dim=16
         )
-        self.flat = self.flatten = tf.keras.layers.Flatten()
+        self.flatten = tf.keras.layers.Flatten()
         self.layer1 = tf.keras.layers.Dense(units=128, activation="relu")
         self.dropout = tf.keras.layers.Dropout(rate=0.3)
         self.dense = tf.keras.layers.Dense(units=1)
@@ -117,7 +117,7 @@ class ChoiceNetSimple(tf.keras.Model):
     def call(self, inputs, training=None, mask=None):
         tl_model_weights, ft_dataset_weights = inputs
         x = self.layer_reduce(tl_model_weights)
-        x = self.flat(x)
+        x = self.flatten(x)
         concat = tf.concat([x, ft_dataset_weights], axis=1)
         x = self.layer1(concat)
         x = self.dropout(x, training=training)
