@@ -19,23 +19,34 @@ from training import LOG_DIR
 from training.create_tlds import DEFAULT_CSV_SUMMARY, TL_MODELS_SAVE_DIR
 
 
-class TLDSSequence(tf.keras.utils.Sequence):
-    """Handy sequence to auto-compute batch size."""
+class TLDataset(tf.keras.utils.Sequence):
+    """Convert raw transfer learning dataset (TLDS) into trainable form."""
+
+    @classmethod
+    def collate_arrays(
+        cls, dataset: list[tuple[tuple[np.ndarray, np.ndarray], float]]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Vertically stack embeddings and accuracies into stacked ndarrays."""
+        flattened = [
+            (x[0][np.newaxis, :], x[1][np.newaxis, :], y) for (x, y) in dataset
+        ]
+        x0, x1, y = zip(*flattened)
+        return np.vstack(x0), np.vstack(x1), np.array(y)
 
     def __init__(
         self,
         dataset: list[tuple[tuple[np.ndarray, np.ndarray], float]],
         batch_size: int = 32,
     ):
-        self.dataset = dataset
+        self.arrays = self.collate_arrays(dataset)
         self.batch_size = batch_size
 
     def __len__(self) -> int:
-        return math.ceil(len(self.dataset) / self.batch_size)
+        return math.ceil(len(self.arrays[2]) / self.batch_size)
 
     def __getitem__(self, idx: int) -> tuple[tuple[np.ndarray, np.ndarray], np.ndarray]:
-        x, y = self.dataset[idx]
-        return x, np.array([y])
+        bslice = slice(idx * self.batch_size, (idx + 1) * self.batch_size)
+        return (self.arrays[0][bslice], self.arrays[1][bslice]), self.arrays[2][bslice]
 
 
 def train(args: argparse.Namespace) -> None:
@@ -65,15 +76,7 @@ def train(args: argparse.Namespace) -> None:
                 ",".join(map(str, labels_name)),
             )
             model.load_weights(weights_path).expect_partial()
-            tlds.append(
-                (
-                    (
-                        embed_model(model)[np.newaxis, :],
-                        embed_dataset(dataset)[np.newaxis, :],
-                    ),
-                    accuracy,
-                )
-            )
+            tlds.append(((embed_model(model), embed_dataset(dataset)), accuracy))
 
     model = ChoiceNetSimple()
     model.compile(
@@ -81,7 +84,7 @@ def train(args: argparse.Namespace) -> None:
         loss="mse",
         metrics=["mse"],
     )
-    sequence = TLDSSequence(tlds)  # TODO: make batch_size an arg
+    sequence = TLDataset(tlds)  # TODO: make batch_size an arg
     model.fit(sequence)
     _ = 0  # Debug here
 
