@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import tempfile
 from collections.abc import Sequence
+from typing import Annotated
 
 import tensorflow as tf
 
@@ -114,7 +115,7 @@ class ChoiceNetSimple(tf.keras.Model):
         self.dropout = tf.keras.layers.Dropout(rate=0.3)
         self.dense = tf.keras.layers.Dense(units=1)
 
-    def call(self, inputs, training=None, mask=None):
+    def call(self, inputs: Annotated[Sequence[tf.Tensor], 2], training=None, mask=None):
         tl_model_weights, ft_dataset_weights = inputs
         x = self.layer_reduce(tl_model_weights)
         x = self.flatten(x)
