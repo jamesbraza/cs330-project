@@ -7,16 +7,15 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from data.dataset import (
-    DATASET_CONFIGS,
-    DEFAULT_SEED,
-    get_dataset_subset,
-    get_plant_diseases_datasets,
-)
+from data.dataset import DATASET_CONFIGS, DEFAULT_SEED
 from embedding.embed import embed_dataset, embed_model
 from models.core import ChoiceNetSimple, TransferModel
 from training import LOG_DIR
-from training.create_tlds import DEFAULT_CSV_SUMMARY, TL_MODELS_SAVE_DIR
+from training.create_tlds import (
+    DEFAULT_CSV_SUMMARY,
+    FINE_TUNE_DS_SAVE_DIR,
+    TL_MODELS_SAVE_DIR,
+)
 
 
 class TLDataset(tf.keras.utils.Sequence):
@@ -52,18 +51,14 @@ class TLDataset(tf.keras.utils.Sequence):
 def train(args: argparse.Namespace) -> None:
     tf.random.set_seed(args.seed)
 
+    ft_ds = tf.data.Dataset.load(FINE_TUNE_DS_SAVE_DIR)
+
     tlds: list[tuple[tuple[np.ndarray, np.ndarray], float]] = []
     with open(args.tlds_csv_summary, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             dataset_config = DATASET_CONFIGS[row["dataset"]]
             labels_name = json.loads(row["labels"])
-            dataset = get_dataset_subset(
-                labels=labels_name,
-                dataset=row["dataset"],
-                batch_size=int(row["batch_size"]),
-                num_batches=int(row["num_batches"]),
-            )
             accuracy = float(row["accuracy"])
             model = TransferModel(
                 input_shape=dataset_config.image_shape,
@@ -76,7 +71,7 @@ def train(args: argparse.Namespace) -> None:
                 ",".join(map(str, labels_name)),
             )
             model.load_weights(weights_path).expect_partial()
-            tlds.append(((embed_model(model), embed_dataset(dataset)), accuracy))
+            tlds.append(((embed_model(model), embed_dataset(ft_ds)), accuracy))
 
     model = ChoiceNetSimple()
     model.compile(
