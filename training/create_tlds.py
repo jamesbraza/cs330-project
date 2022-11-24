@@ -71,6 +71,8 @@ def train(args: argparse.Namespace) -> None:
         preprocess_standardize(ds, num_classes=len(plants_labels))
         for ds in (ft_ds, test_ds)
     )
+    if os.path.exists(FINE_TUNE_DS_SAVE_DIR):
+        os.removedirs(FINE_TUNE_DS_SAVE_DIR)  # Only persist one dataset
     # Save this for ChoiceNet training downstream
     ft_ds.save(FINE_TUNE_DS_SAVE_DIR)
 
