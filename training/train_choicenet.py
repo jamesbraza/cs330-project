@@ -18,7 +18,7 @@ from training.create_tlds import (
 )
 
 
-class TLDataset(tf.keras.utils.Sequence):
+class TLDSSequence(tf.keras.utils.Sequence):
     """Convert raw transfer learning dataset (TLDS) into trainable form."""
 
     @classmethod
@@ -90,13 +90,13 @@ def train(args: argparse.Namespace) -> None:
         raise ValueError(
             f"Split {args.validation_split} results in an empty test dataset."
         )
-    training_dataset = TLDataset(tlds[:num_training_ds], batch_size=args.batch_size)
-    test_dataset = TLDataset(tlds[num_training_ds:], batch_size=args.batch_size)
+    training_dataseq = TLDSSequence(tlds[:num_training_ds], batch_size=args.batch_size)
+    test_dataseq = TLDSSequence(tlds[num_training_ds:], batch_size=args.batch_size)
 
-    model.fit(training_dataset)
-    preds: np.ndarray = model.predict(test_dataset)
+    model.fit(training_dataseq)
+    preds: np.ndarray = model.predict(test_dataseq)
     accuracies: list[np.ndarray] = [
-        test_dataset.get_accuracies(i) for i in range(len(test_dataset))
+        test_dataseq.get_accuracies(i) for i in range(len(test_dataseq))
     ]
     _ = 0  # Debug here
 
