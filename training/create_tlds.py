@@ -5,12 +5,14 @@ import os
 
 import tensorflow as tf
 
+from data import DATA_DIR
 from data.dataset import (
     DATASET_CONFIGS,
     DEFAULT_BATCH_SIZE,
     DEFAULT_NUM_CLASSES,
     DEFAULT_NUM_DATASETS,
     DEFAULT_SEED,
+    TRAIN_VAL_BASE_REL_PATH,
     get_plant_diseases_datasets,
     get_random_datasets,
     preprocess,
@@ -22,6 +24,9 @@ from training import LOG_DIR, TRAINING_DIR
 
 DEFAULT_CSV_SUMMARY = os.path.join(TRAINING_DIR, "tlds_summary.csv")
 TL_MODELS_SAVE_DIR = os.path.join(MODEL_SAVE_DIR, "tl_models")
+FINE_TUNE_DS_SAVE_DIR = os.path.join(
+    DATA_DIR, TRAIN_VAL_BASE_REL_PATH.split("/")[0], "ds_export"
+)
 
 
 def preprocess_standardize(
@@ -66,6 +71,8 @@ def train(args: argparse.Namespace) -> None:
         preprocess_standardize(ds, num_classes=len(plants_labels))
         for ds in (ft_ds, test_ds)
     )
+    # Save this for ChoiceNet training downstream
+    ft_ds.save(FINE_TUNE_DS_SAVE_DIR)
 
     model = TransferModel(
         input_shape=dataset_config.image_shape, num_classes=dataset_config.num_classes
