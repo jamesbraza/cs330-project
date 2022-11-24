@@ -1,6 +1,6 @@
 import os
 from collections.abc import Callable, Sequence
-from typing import NamedTuple, TypeAlias
+from typing import Literal, NamedTuple, TypeAlias
 
 import numpy as np
 import tensorflow as tf
@@ -117,6 +117,7 @@ def get_plant_diseases_datasets(
     num_train_batch: int = ALL,
     num_val_batch: int = ALL,
     seed: int = DEFAULT_SEED,
+    subset: Literal["training", "validation"] = "train",
     **from_dir_kwargs,
 ) -> tuple[tf.data.Dataset, tf.data.Dataset, list[PlantLabel]]:
     """
@@ -128,6 +129,7 @@ def get_plant_diseases_datasets(
         num_train_batch: Number of batches in the training subset, default fetches all.
         num_val_batch: Number of batches in the validation subset, default fetches all.
         seed: Seed to use for train-validation split.
+        subset: Subset (default is training) of the plant diseases dataset use.
         from_dir_kwargs: Override keyword arguments to pass through to both
             tf.keras.utils.image_dataset_from_directory calls.
 
@@ -137,8 +139,9 @@ def get_plant_diseases_datasets(
             with string labels.
     """
     from_dir_kwargs = {"seed": seed, "validation_split": 0.1} | from_dir_kwargs
+    directory: str = PLANT_DISEASES_TRAIN if subset == "train" else PLANT_DISEASES_VAL
     train_ds, val_ds = tf.keras.utils.image_dataset_from_directory(
-        PLANT_DISEASES_TRAIN, subset="both", **from_dir_kwargs
+        directory, subset="both", **from_dir_kwargs
     )
     # NOTE: indices correspond with ID, values correspond with string
     labels: list[PlantLabel] = [
