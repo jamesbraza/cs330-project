@@ -86,6 +86,10 @@ def train(args: argparse.Namespace) -> None:
     )
 
     num_training_ds = int(len(tlds) * (1 - args.validation_split))
+    if num_training_ds >= len(tlds):
+        raise ValueError(
+            f"Split {args.validation_split} results in an empty test dataset."
+        )
     training_dataset = TLDataset(tlds[:num_training_ds], batch_size=args.batch_size)
     test_dataset = TLDataset(tlds[num_training_ds:], batch_size=args.batch_size)
 
