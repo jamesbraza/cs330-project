@@ -91,14 +91,6 @@ def train(args: argparse.Namespace) -> None:
     tf.random.set_seed(args.seed)
 
     tlds = build_raw_tlds(summary_path=args.tlds_csv_summary)
-
-    model = ChoiceNetSimple()
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
-        loss="mse",
-        metrics=["mse"],
-    )
-
     num_training_ds = int(len(tlds) * (1 - args.validation_split))
     if num_training_ds >= len(tlds):
         raise ValueError(
@@ -106,6 +98,13 @@ def train(args: argparse.Namespace) -> None:
         )
     training_dataseq = TLDSSequence(tlds[:num_training_ds], batch_size=args.batch_size)
     test_dataseq = TLDSSequence(tlds[num_training_ds:], batch_size=args.batch_size)
+
+    model = ChoiceNetSimple()
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
+        loss="mse",
+        metrics=["mse"],
+    )
 
     model.fit(training_dataseq)
     preds: np.ndarray = model.predict(test_dataseq)
