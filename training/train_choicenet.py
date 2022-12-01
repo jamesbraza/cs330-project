@@ -10,11 +10,11 @@ import tensorflow as tf
 from data.dataset import DATASET_CONFIGS, DEFAULT_BATCH_SIZE, DEFAULT_SEED
 from embedding.embed import embed_dataset, embed_model
 from models.core import ChoiceNetSimple, TransferModel
-from training import LOG_DIR
+from training import LOG_DIR, TLDS_DIR
 from training.create_tlds import (
+    BIRD_SPECIES_TRAIN_SAVE_DIR,
     DEFAULT_CSV_SUMMARY,
-    FINE_TUNE_DS_SAVE_DIR,
-    TL_MODELS_SAVE_DIR,
+    PLANT_DISEASES_TRAIN_SAVE_DIR,
 )
 
 
@@ -53,30 +53,42 @@ class TLDSSequence(tf.keras.utils.Sequence):
         return self.arrays[2][bslice]
 
 
-def train(args: argparse.Namespace) -> None:
-    tf.random.set_seed(args.seed)
-
-    ft_ds = tf.data.Dataset.load(FINE_TUNE_DS_SAVE_DIR)
+def build_raw_tlds(
+    summary_path: str,
+) -> list[tuple[tuple[np.ndarray, np.ndarray], float]]:
+    """Build a raw version of the transfer-learning dataset."""
+    plants_ft_ds = tf.data.Dataset.load(PLANT_DISEASES_TRAIN_SAVE_DIR)
+    birds_ft_ds = tf.data.Dataset.load(BIRD_SPECIES_TRAIN_SAVE_DIR)
 
     tlds: list[tuple[tuple[np.ndarray, np.ndarray], float]] = []
-    with open(args.tlds_csv_summary, encoding="utf-8") as f:
+    with open(summary_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             dataset_config = DATASET_CONFIGS[row["dataset"]]
-            labels_name = json.loads(row["labels"])
-            accuracy = float(row["accuracy"])
             model = TransferModel(
                 input_shape=dataset_config.image_shape,
                 num_classes=dataset_config.num_classes,
             )
             weights_path = os.path.join(
-                TL_MODELS_SAVE_DIR,
+                TLDS_DIR,
                 row["seed"],
-                row["nickname"],
-                ",".join(map(str, labels_name)),
+                ",".join(map(str, json.loads(row["labels"]))),
+                "tl_model",
             )
             model.load_weights(weights_path).expect_partial()
-            tlds.append(((embed_model(model), embed_dataset(ft_ds)), accuracy))
+            embedded_model = embed_model(model)
+            for ds, accuracy in [
+                (plants_ft_ds, float(row["plants_accuracy"])),
+                (birds_ft_ds, float(row["birds_accuracy"])),
+            ]:
+                tlds.append(((embedded_model, embed_dataset(ds)), accuracy))
+    return tlds
+
+
+def train(args: argparse.Namespace) -> None:
+    tf.random.set_seed(args.seed)
+
+    tlds = build_raw_tlds(summary_path=args.tlds_csv_summary)
 
     model = ChoiceNetSimple()
     model.compile(
