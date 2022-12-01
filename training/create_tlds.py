@@ -97,11 +97,39 @@ def train(args: argparse.Namespace) -> None:
         ft_ds_save_dir=BIRD_SPECIES_TRAIN_SAVE_DIR,
     )
 
+    def compute_accuracy(tl_model: tf.keras.Model) -> list[float]:
+        accuracies: list[float] = []
+        for (ft_ds, test_ds, num_classes) in [
+            (plants_ft_ds, plants_test_ds, len(plants_labels)),
+            (birds_ft_ds, birds_test_ds, len(birds_labels)),
+        ]:
+            new_model = tl_model.clone(new_num_classes=num_classes)
+            new_model.layer1.trainable = False
+            new_model.layer2.trainable = False
+
+            # NOTE: reset the optimizer before fine-tuning
+            new_model.compile(
+                optimizer=tf.keras.optimizers.Adam(learning_rate=args.ft_learning_rate),
+                loss="categorical_crossentropy",
+                metrics=["accuracy"],
+            )
+
+            new_model.fit(ft_ds, epochs=args.num_epochs)
+            _, accuracy = new_model.evaluate(test_ds)
+            accuracies.append(accuracy)
+        return accuracies
+
     model = TransferModel(
         input_shape=dataset_config.image_shape, num_classes=dataset_config.num_classes
     )
     # Build to populate weights for Checkpoint
     model.build(input_shape=model.input_layer.input_shape[0])
+
+    # Save results for randomly initialized model
+    with open(args.tlds_csv_summary, mode="a", encoding="utf-8") as f:
+        csv.writer(f).writerow(
+            [args.dataset, args.seed, "randinit"] + compute_accuracy(model)
+        )
 
     # 1. Save randomly initialized weights to begin training with the same state
     random_init_path = os.path.join(MODEL_SAVE_DIR, "base_models", str(args.seed))
@@ -154,43 +182,11 @@ def train(args: argparse.Namespace) -> None:
         )
         model.save_weights(os.path.join(base_tl_path, "tl_model"))
 
-        # 4. Prepare for fine-tuning
-        accuracies: list[float] = []
-        for (ft_ds, test_ds, num_classes) in [
-            (plants_ft_ds, plants_test_ds, len(plants_labels)),
-            (birds_ft_ds, birds_test_ds, len(birds_labels)),
-        ]:
-            new_model = model.clone(new_num_classes=num_classes)
-            new_model.layer1.trainable = False
-            new_model.layer2.trainable = False
-
-            # NOTE: reset the optimizer before fine-tuning
-            new_model.compile(
-                optimizer=tf.keras.optimizers.Adam(learning_rate=args.ft_learning_rate),
-                loss="categorical_crossentropy",
-                metrics=["accuracy"],
-            )
-
-            # 5. Perform the fine-tuning
-            new_model.fit(
-                ft_ds,
-                epochs=args.num_epochs,
-                callbacks=[
-                    tf.keras.callbacks.TensorBoard(
-                        log_dir=os.path.join(
-                            LOG_DIR, "ft_logs", str(args.seed), labels_path
-                        ),
-                        histogram_freq=1,
-                    )
-                ],
-            )
-
-            # 6. Perform predictions on the test dataset
-            _, accuracy = new_model.evaluate(test_ds)
-            accuracies.append(accuracy)
-
+        # 4. Perform fine-tuning, testing, and save the accuracy
         with open(args.tlds_csv_summary, mode="a", encoding="utf-8") as f:
-            csv.writer(f).writerow([args.dataset, args.seed, labels_name] + accuracies)
+            csv.writer(f).writerow(
+                [args.dataset, args.seed, labels_name] + compute_accuracy(model)
+            )
 
     _ = 0  # Debug here
 
