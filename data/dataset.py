@@ -1,6 +1,7 @@
+import itertools
 import os
 from collections.abc import Callable, Sequence
-from typing import Literal, NamedTuple, TypeAlias
+from typing import NamedTuple, TypeAlias
 
 import numpy as np
 import tensorflow as tf
@@ -98,11 +99,54 @@ def get_dataset_subset(
     )
 
 
-TRAIN_VAL_BASE_REL_PATH = "plant-diseases/New Plant Diseases Dataset(Augmented)/New Plant Diseases Dataset(Augmented)"
-TRAIN_REL_PATH_PARTICLES: list[str] = [*TRAIN_VAL_BASE_REL_PATH.split("/"), "train"]
-VAL_REL_PATH_PARTICLES: list[str] = [*TRAIN_VAL_BASE_REL_PATH.split("/"), "valid"]
-PLANT_DISEASES_TRAIN = os.path.join(DATA_DIR, *TRAIN_REL_PATH_PARTICLES)
-PLANT_DISEASES_VAL = os.path.join(DATA_DIR, *VAL_REL_PATH_PARTICLES)
+PLANT_DISEASES_REL_PATH = "plant-diseases/New Plant Diseases Dataset(Augmented)/New Plant Diseases Dataset(Augmented)"
+PLANT_DISEASES_TRAIN = os.path.join(
+    DATA_DIR, *PLANT_DISEASES_REL_PATH.split("/"), "train"
+)
+PLANT_DISEASES_VAL = os.path.join(
+    DATA_DIR, *PLANT_DISEASES_REL_PATH.split("/"), "valid"
+)
+BIRD_SPECIES_REL_PATH = "bird-species"
+BIRD_SPECIES_TRAIN = os.path.join(DATA_DIR, *BIRD_SPECIES_REL_PATH.split("/"), "train")
+BIRD_SPECIES_VAL = os.path.join(DATA_DIR, *BIRD_SPECIES_REL_PATH.split("/"), "valid")
+
+
+def get_image_dataset_from_directory(
+    train_dir: str,
+    val_dir: str,
+    num_train_batch: int = ALL,
+    num_val_batch: int = ALL,
+    seed: int = DEFAULT_SEED,
+    **from_dir_kwargs,
+) -> tuple[tf.data.Dataset, tf.data.Dataset, list[str]]:
+    """
+    Get the training and validation subsets of a dataset.
+
+    Args:
+        train_dir: Directory of the training subset.
+        val_dir: Directory of the validation subset.
+        num_train_batch: Number of batches in the training subset, default fetches all.
+        num_val_batch: Number of batches in the validation subset, default fetches all.
+        seed: Seed to use for train-validation split.
+        from_dir_kwargs: Override keyword arguments to pass through to both
+            tf.keras.utils.image_dataset_from_directory calls.
+
+    Returns:
+        Tuple of training dataset, validation dataset, labels.
+    """
+    from_dir_kwargs = {"seed": seed} | from_dir_kwargs
+    train_ds = tf.keras.utils.image_dataset_from_directory(train_dir, **from_dir_kwargs)
+    val_ds = tf.keras.utils.image_dataset_from_directory(val_dir, **from_dir_kwargs)
+    # Use insertion-ordered dict for ordered set union hack
+    union_labels: dict[str, None] = {
+        cn: None for cn in itertools.chain(train_ds.class_names, val_ds.class_names)
+    }
+    # NOTE: .take() wipes away the ephemeral class_names attribute
+    return (
+        train_ds.take(num_train_batch),
+        val_ds.take(num_val_batch),
+        list(union_labels.keys()),
+    )
 
 
 class PlantLabel(NamedTuple):
@@ -117,39 +161,57 @@ def get_plant_diseases_datasets(
     num_train_batch: int = ALL,
     num_val_batch: int = ALL,
     seed: int = DEFAULT_SEED,
-    subset: Literal["training", "validation"] = "train",
     **from_dir_kwargs,
 ) -> tuple[tf.data.Dataset, tf.data.Dataset, list[PlantLabel]]:
     """
-    Get the training and validation subsets of the plants dataset.
+    Get the training and validation subsets of the plant diseases dataset.
 
     SEE: https://www.kaggle.com/datasets/vipoooool/new-plant-diseases-dataset
-
-    Args:
-        num_train_batch: Number of batches in the training subset, default fetches all.
-        num_val_batch: Number of batches in the validation subset, default fetches all.
-        seed: Seed to use for train-validation split.
-        subset: Subset (default is training) of the plant diseases dataset use.
-        from_dir_kwargs: Override keyword arguments to pass through to both
-            tf.keras.utils.image_dataset_from_directory calls.
 
     Returns:
         Tuple of training dataset, validation dataset, labels.
             NOTE: for labels, indices correspond with ID, values correspond
             with string labels.
     """
-    from_dir_kwargs = {"seed": seed, "validation_split": 0.1} | from_dir_kwargs
-    directory: str = PLANT_DISEASES_TRAIN if subset == "train" else PLANT_DISEASES_VAL
-    train_ds, val_ds = tf.keras.utils.image_dataset_from_directory(
-        directory, subset="both", **from_dir_kwargs
+    train_ds, val_ds, raw_labels = get_image_dataset_from_directory(
+        train_dir=PLANT_DISEASES_TRAIN,
+        val_dir=PLANT_DISEASES_VAL,
+        num_train_batch=num_train_batch,
+        num_val_batch=num_val_batch,
+        seed=seed,
+        **from_dir_kwargs,
     )
     # NOTE: indices correspond with ID, values correspond with string
     labels: list[PlantLabel] = [
-        PlantLabel(raw_label, *raw_label.split("___"))
-        for raw_label in set().union(train_ds.class_names, val_ds.class_names)
+        PlantLabel(raw_label, *raw_label.split("___")) for raw_label in raw_labels
     ]
-    # NOTE: .take() wipes away the ephemeral class_names attribute
-    return train_ds.take(num_train_batch), val_ds.take(num_val_batch), labels
+    return train_ds, val_ds, labels
+
+
+def get_bird_species_datasets(
+    num_train_batch: int = ALL,
+    num_val_batch: int = ALL,
+    seed: int = DEFAULT_SEED,
+    **from_dir_kwargs,
+) -> tuple[tf.data.Dataset, tf.data.Dataset, list[str]]:
+    """
+    Get the training and validation subsets of the bird species dataset.
+
+    SEE: https://www.kaggle.com/datasets/gpiosenka/100-bird-species
+
+    Returns:
+        Tuple of training dataset, validation dataset, labels.
+            NOTE: for labels, indices correspond with ID, values correspond
+            with string labels.
+    """
+    return get_image_dataset_from_directory(
+        train_dir=BIRD_SPECIES_TRAIN,
+        val_dir=BIRD_SPECIES_VAL,
+        num_train_batch=num_train_batch,
+        num_val_batch=num_val_batch,
+        seed=seed,
+        **from_dir_kwargs,
+    )
 
 
 def split(

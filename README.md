@@ -4,14 +4,18 @@
 
 ## Datasets
 
-We are using [New Plant Diseases Dataset][2] from Kaggle, containing 256 x 256 images:
+We used two datasets from Kaggle:
 
-> Image dataset containing different healthy and unhealthy crop leaves.
+- [New Plant Diseases Dataset][2]:
+  256 x 256 RGB JPG images of healthy and unhealthy crop leaves
+- [BIRDS 450 SPECIES- IMAGE CLASSIFICATION][3]:
+  224 x 224 RGB JPG images of bird species
 
-Here's how to easily download it using the Kaggle API:
+Here's how to easily download both with the Kaggle API:
 
 ```bash
 kaggle datasets download -p data/plant-diseases --unzip vipoooool/new-plant-diseases-dataset
+kaggle datasets download -p data/bird-species --unzip gpiosenka/100-bird-species
 ```
 
 ## Developers
@@ -66,8 +70,7 @@ To run ChoiceNet training:
 
 Neet to run pre-process weight & pre-process dataset before runing choicenet.
 
-For dataset, the fine-tune dataset is repeating N copy of itself , where N equal to the number of pre-train networks weights. 
-
+For dataset, the fine-tune dataset is repeating N copy of itself , where N equal to the number of pre-train networks weights.
 
 ```bash
 bash 3.run_choice_net.sh
@@ -77,3 +80,4 @@ Finally, need to rund td_predict
 
 [1]: https://cs330.stanford.edu/
 [2]: https://www.kaggle.com/datasets/vipoooool/new-plant-diseases-dataset
+[3]: https://www.kaggle.com/datasets/gpiosenka/100-bird-species

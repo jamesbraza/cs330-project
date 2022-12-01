@@ -2,17 +2,20 @@ import argparse
 import csv
 import math
 import os
+import shutil
 
 import tensorflow as tf
 
 from data import DATA_DIR
 from data.dataset import (
+    BIRD_SPECIES_REL_PATH,
     DATASET_CONFIGS,
     DEFAULT_BATCH_SIZE,
     DEFAULT_NUM_CLASSES,
     DEFAULT_NUM_DATASETS,
     DEFAULT_SEED,
-    TRAIN_VAL_BASE_REL_PATH,
+    PLANT_DISEASES_REL_PATH,
+    get_bird_species_datasets,
     get_plant_diseases_datasets,
     get_random_datasets,
     preprocess,
@@ -20,12 +23,14 @@ from data.dataset import (
 )
 from models import MODEL_SAVE_DIR
 from models.core import TransferModel
-from training import LOG_DIR, TRAINING_DIR
+from training import LOG_DIR, TLDS_DIR, TRAINING_DIR
 
 DEFAULT_CSV_SUMMARY = os.path.join(TRAINING_DIR, "tlds_summary.csv")
-TL_MODELS_SAVE_DIR = os.path.join(MODEL_SAVE_DIR, "tl_models")
-FINE_TUNE_DS_SAVE_DIR = os.path.join(
-    DATA_DIR, TRAIN_VAL_BASE_REL_PATH.split("/")[0], "ds_export"
+PLANT_DISEASES_TRAIN_SAVE_DIR = os.path.join(
+    DATA_DIR, *PLANT_DISEASES_REL_PATH.split("/"), "train_ds_export"
+)
+BIRD_SPECIES_TRAIN_SAVE_DIR = os.path.join(
+    DATA_DIR, *BIRD_SPECIES_REL_PATH.split("/"), "train_ds_export"
 )
 
 
@@ -40,41 +45,57 @@ def preprocess_standardize(
     ).prefetch(prefetch_size)
 
 
+def preprocess_ds_save(
+    ft_ds: tf.data.Dataset,
+    test_ds: tf.data.Dataset,
+    num_classes: int,
+    ft_ds_save_dir: str,
+) -> tuple[tf.data.Dataset, tf.data.Dataset]:
+    """Preprocess both fine-tuning and test datasets, saving the fine-tuning dataset."""
+    ft_ds, test_ds = (
+        preprocess_standardize(ds, num_classes=num_classes) for ds in (ft_ds, test_ds)
+    )
+    if os.path.exists(ft_ds_save_dir):
+        shutil.rmtree(ft_ds_save_dir)  # Only persist one dataset
+    ft_ds.save(ft_ds_save_dir)
+    return ft_ds, test_ds
+
+
 def train(args: argparse.Namespace) -> None:
     tf.random.set_seed(args.seed)
     dataset_config = DATASET_CONFIGS[args.dataset]
 
-    seed_nickname = [str(args.seed), args.run_nickname]
-    summary_fields = args.dataset, args.batch_size, args.tl_num_batches, *seed_nickname
     with open(args.tlds_csv_summary, mode="w", encoding="utf-8") as f:
         csv.writer(f).writerow(
-            [
-                "dataset",
-                "batch_size",
-                "num_batches",
-                "seed",
-                "nickname",
-                "labels",
-                "accuracy",
-            ]
+            ["dataset", "seed", "labels", "plants_accuracy", "birds_accuracy"]
         )
 
-    # NOTE: these are already batched
-    ft_ds, test_ds, plants_labels = get_plant_diseases_datasets(
+    plants_ft_ds, plants_test_ds, plants_labels = get_plant_diseases_datasets(
         num_train_batch=args.ft_num_batches,
         num_val_batch=args.test_num_batches,
         seed=args.seed,
         batch_size=args.batch_size,
         image_size=dataset_config.image_shape[:-1],
     )
-    ft_ds, test_ds = (
-        preprocess_standardize(ds, num_classes=len(plants_labels))
-        for ds in (ft_ds, test_ds)
+    plants_ft_ds, plants_test_ds = preprocess_ds_save(
+        plants_ft_ds,
+        plants_test_ds,
+        num_classes=len(plants_labels),
+        ft_ds_save_dir=PLANT_DISEASES_TRAIN_SAVE_DIR,
     )
-    if os.path.exists(FINE_TUNE_DS_SAVE_DIR):
-        os.removedirs(FINE_TUNE_DS_SAVE_DIR)  # Only persist one dataset
-    # Save this for ChoiceNet training downstream
-    ft_ds.save(FINE_TUNE_DS_SAVE_DIR)
+    birds_ft_ds, birds_test_ds, birds_labels = get_bird_species_datasets(
+        num_train_batch=args.ft_num_batches,
+        num_val_batch=args.test_num_batches,
+        seed=args.seed,
+        batch_size=args.batch_size,
+        image_size=dataset_config.image_shape[:-1],
+    )
+    birds_ft_ds, birds_test_ds = preprocess_ds_save(
+        birds_ft_ds,
+        birds_test_ds,
+        num_classes=len(birds_labels),
+        ft_ds_save_dir=BIRD_SPECIES_TRAIN_SAVE_DIR,
+    )
 
     model = TransferModel(
         input_shape=dataset_config.image_shape, num_classes=dataset_config.num_classes
@@ -83,7 +104,7 @@ def train(args: argparse.Namespace) -> None:
     model.build(input_shape=model.input_layer.input_shape[0])
 
     # 1. Save randomly initialized weights to begin training with the same state
-    random_init_path = os.path.join(MODEL_SAVE_DIR, "base_models", *seed_nickname)
+    random_init_path = os.path.join(MODEL_SAVE_DIR, "base_models", str(args.seed))
     random_init_checkpoint = tf.train.Checkpoint(model)
     if not os.path.exists(f"{random_init_path}-1.index"):
         saved_path = random_init_checkpoint.save(random_init_path)
@@ -102,6 +123,7 @@ def train(args: argparse.Namespace) -> None:
         labels_name = str(list(labels)).replace(" ", "")
         # Keras can't handle [] per https://github.com/keras-team/keras/issues/17265
         labels_path = labels_name[1:-1]
+        base_tl_path = os.path.join(TLDS_DIR, str(args.seed), labels_path)
 
         # 2. Load randomly initialized weights
         random_init_checkpoint.restore(f"{random_init_path}-1")
@@ -116,6 +138,7 @@ def train(args: argparse.Namespace) -> None:
             preprocess_standardize(ds, num_classes=dataset_config.num_classes)
             for ds in split(dataset)
         )
+        train_ds.save(os.path.join(base_tl_path, "tl_dataset"))
         model.fit(
             train_ds,
             epochs=args.num_epochs,
@@ -123,48 +146,51 @@ def train(args: argparse.Namespace) -> None:
             callbacks=[
                 tf.keras.callbacks.TensorBoard(
                     log_dir=os.path.join(
-                        LOG_DIR, "tl_logs", *seed_nickname, labels_path
+                        LOG_DIR, "tl_logs", str(args.seed), labels_path
                     ),
                     histogram_freq=1,
                 )
             ],
         )
-        # Save the TL model as part of the transfer learning dataset
-        model.save_weights(
-            os.path.join(TL_MODELS_SAVE_DIR, *seed_nickname, labels_path)
-        )
+        model.save_weights(os.path.join(base_tl_path, "tl_model"))
 
         # 4. Prepare for fine-tuning
-        # TODO: utilize copying of weights here
-        new_model = model.clone(new_num_classes=len(plants_labels))
-        new_model.layer1.trainable = False
-        new_model.layer2.trainable = False
+        accuracies: list[float] = []
+        for (ft_ds, test_ds, num_classes) in [
+            (plants_ft_ds, plants_test_ds, len(plants_labels)),
+            (birds_ft_ds, birds_test_ds, len(birds_labels)),
+        ]:
+            new_model = model.clone(new_num_classes=num_classes)
+            new_model.layer1.trainable = False
+            new_model.layer2.trainable = False
 
-        # NOTE: reset the optimizer before fine-tuning
-        new_model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=args.ft_learning_rate),
-            loss="categorical_crossentropy",
-            metrics=["accuracy"],
-        )
+            # NOTE: reset the optimizer before fine-tuning
+            new_model.compile(
+                optimizer=tf.keras.optimizers.Adam(learning_rate=args.ft_learning_rate),
+                loss="categorical_crossentropy",
+                metrics=["accuracy"],
+            )
 
-        # 5. Perform the fine-tuning
-        new_model.fit(
-            ft_ds,
-            epochs=args.num_epochs,
-            callbacks=[
-                tf.keras.callbacks.TensorBoard(
-                    log_dir=os.path.join(
-                        LOG_DIR, "ft_logs", *seed_nickname, labels_path
-                    ),
-                    histogram_freq=1,
-                )
-            ],
-        )
+            # 5. Perform the fine-tuning
+            new_model.fit(
+                ft_ds,
+                epochs=args.num_epochs,
+                callbacks=[
+                    tf.keras.callbacks.TensorBoard(
+                        log_dir=os.path.join(
+                            LOG_DIR, "ft_logs", str(args.seed), labels_path
+                        ),
+                        histogram_freq=1,
+                    )
+                ],
+            )
 
-        # 6. Perform predictions on the test dataset
-        loss, accuracy = new_model.evaluate(test_ds)
+            # 6. Perform predictions on the test dataset
+            _, accuracy = new_model.evaluate(test_ds)
+            accuracies.append(accuracy)
+
         with open(args.tlds_csv_summary, mode="a", encoding="utf-8") as f:
-            csv.writer(f).writerow([*summary_fields, labels_name, accuracy])
+            csv.writer(f).writerow([args.dataset, args.seed, labels_name] + accuracies)
 
     _ = 0  # Debug here
 
@@ -217,7 +243,7 @@ def main() -> None:
     parser.add_argument(
         "--ft_learning_rate",
         type=float,
-        default=1e-4,
+        default=1e-3,
         help="learning rate for fine-tuning",
     )
     parser.add_argument(
@@ -227,12 +253,6 @@ def main() -> None:
         help="number of batches to have in the test dataset",
     )
     parser.add_argument("--num_epochs", type=int, default=15, help="number of epochs")
-    parser.add_argument(
-        "--run_nickname",
-        type=str,
-        default="foo",
-        help="nickname for saving logs/models",
-    )
     parser.add_argument(
         "--log_dir", type=str, default=LOG_DIR, help="log base directory"
     )

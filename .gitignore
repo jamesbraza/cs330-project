@@ -276,13 +276,15 @@ fabric.properties
 *.vsix
 
 # Datasets
-data/plant-diseases
+data/plant-diseases/
+data/bird-species/
 
 # Logs
-training/logs
+training/logs/
 
 # Models
-models/saved_models
+models/saved_models/
 
 # TLDS
+training/tlds/
 training/tlds_summary.csv

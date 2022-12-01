@@ -10,12 +10,46 @@ import tensorflow as tf
 from data.dataset import DATASET_CONFIGS, DEFAULT_BATCH_SIZE, DEFAULT_SEED
 from embedding.embed import embed_dataset, embed_model
 from models.core import ChoiceNetSimple, TransferModel
-from training import LOG_DIR
+from training import LOG_DIR, TLDS_DIR
 from training.create_tlds import (
+    BIRD_SPECIES_TRAIN_SAVE_DIR,
     DEFAULT_CSV_SUMMARY,
-    FINE_TUNE_DS_SAVE_DIR,
-    TL_MODELS_SAVE_DIR,
+    PLANT_DISEASES_TRAIN_SAVE_DIR,
 )
+
+
+def build_raw_tlds(
+    summary_path: str,
+) -> list[tuple[tuple[np.ndarray, np.ndarray], float]]:
+    """Build a raw version of the transfer-learning dataset."""
+    plants_ft_ds = tf.data.Dataset.load(PLANT_DISEASES_TRAIN_SAVE_DIR)
+    embedded_plants_ft_ds = embed_dataset(plants_ft_ds)
+    birds_ft_ds = tf.data.Dataset.load(BIRD_SPECIES_TRAIN_SAVE_DIR)
+    embedded_birds_ft_ds = embed_dataset(birds_ft_ds)
+
+    tlds: list[tuple[tuple[np.ndarray, np.ndarray], float]] = []
+    with open(summary_path, encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            dataset_config = DATASET_CONFIGS[row["dataset"]]
+            model = TransferModel(
+                input_shape=dataset_config.image_shape,
+                num_classes=dataset_config.num_classes,
+            )
+            weights_path = os.path.join(
+                TLDS_DIR,
+                row["seed"],
+                ",".join(map(str, json.loads(row["labels"]))),
+                "tl_model",
+            )
+            model.load_weights(weights_path).expect_partial()
+            embedded_model = embed_model(model)
+            for embedded_ds, accuracy in [
+                (embedded_plants_ft_ds, float(row["plants_accuracy"])),
+                (embedded_birds_ft_ds, float(row["birds_accuracy"])),
+            ]:
+                tlds.append(((embedded_model, embedded_ds), accuracy))
+    return tlds
 
 
 class TLDSSequence(tf.keras.utils.Sequence):
@@ -56,35 +90,7 @@ class TLDSSequence(tf.keras.utils.Sequence):
 def train(args: argparse.Namespace) -> None:
     tf.random.set_seed(args.seed)
 
-    ft_ds = tf.data.Dataset.load(FINE_TUNE_DS_SAVE_DIR)
-
-    tlds: list[tuple[tuple[np.ndarray, np.ndarray], float]] = []
-    with open(args.tlds_csv_summary, encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            dataset_config = DATASET_CONFIGS[row["dataset"]]
-            labels_name = json.loads(row["labels"])
-            accuracy = float(row["accuracy"])
-            model = TransferModel(
-                input_shape=dataset_config.image_shape,
-                num_classes=dataset_config.num_classes,
-            )
-            weights_path = os.path.join(
-                TL_MODELS_SAVE_DIR,
-                row["seed"],
-                row["nickname"],
-                ",".join(map(str, labels_name)),
-            )
-            model.load_weights(weights_path).expect_partial()
-            tlds.append(((embed_model(model), embed_dataset(ft_ds)), accuracy))
-
-    model = ChoiceNetSimple()
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
-        loss="mse",
-        metrics=["mse"],
-    )
-
+    tlds = build_raw_tlds(summary_path=args.tlds_csv_summary)
     num_training_ds = int(len(tlds) * (1 - args.validation_split))
     if num_training_ds >= len(tlds):
         raise ValueError(
@@ -93,11 +99,23 @@ def train(args: argparse.Namespace) -> None:
     training_dataseq = TLDSSequence(tlds[:num_training_ds], batch_size=args.batch_size)
     test_dataseq = TLDSSequence(tlds[num_training_ds:], batch_size=args.batch_size)
 
+    model = ChoiceNetSimple()
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
+        loss="mse",
+        metrics=["mse"],
+    )
+
     model.fit(training_dataseq)
     preds: np.ndarray = model.predict(test_dataseq)
-    accuracies: list[np.ndarray] = [
-        test_dataseq.get_accuracies(i) for i in range(len(test_dataseq))
-    ]
+    for i in range(len(test_dataseq)):
+        batch_preds = preds[:, i]
+        accuracies = test_dataseq.get_accuracies(i)
+        for pred, accuracy in zip(batch_preds, accuracies):
+            print(
+                f"Predicted accuracy {pred * 100:.3f}%, "
+                f"actual accuracy {accuracy * 100:.3f}%."
+            )
     _ = 0  # Debug here
 
 
