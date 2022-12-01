@@ -12,7 +12,7 @@ from data.dataset import (
     DEFAULT_NUM_CLASSES,
     DEFAULT_NUM_DATASETS,
     DEFAULT_SEED,
-    TRAIN_VAL_BASE_REL_PATH,
+    PLANT_DISEASES_REL_PATH,
     get_plant_diseases_datasets,
     get_random_datasets,
     preprocess,
@@ -25,7 +25,7 @@ from training import LOG_DIR, TRAINING_DIR
 DEFAULT_CSV_SUMMARY = os.path.join(TRAINING_DIR, "tlds_summary.csv")
 TL_MODELS_SAVE_DIR = os.path.join(MODEL_SAVE_DIR, "tl_models")
 FINE_TUNE_DS_SAVE_DIR = os.path.join(
-    DATA_DIR, TRAIN_VAL_BASE_REL_PATH.split("/")[0], "ds_export"
+    DATA_DIR, PLANT_DISEASES_REL_PATH.split("/")[0], "ds_export"
 )
 
 
