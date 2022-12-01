@@ -18,6 +18,40 @@ from training.create_tlds import (
 )
 
 
+def build_raw_tlds(
+    summary_path: str,
+) -> list[tuple[tuple[np.ndarray, np.ndarray], float]]:
+    """Build a raw version of the transfer-learning dataset."""
+    plants_ft_ds = tf.data.Dataset.load(PLANT_DISEASES_TRAIN_SAVE_DIR)
+    embedded_plants_ft_ds = embed_dataset(plants_ft_ds)
+    birds_ft_ds = tf.data.Dataset.load(BIRD_SPECIES_TRAIN_SAVE_DIR)
+    embedded_birds_ft_ds = embed_dataset(birds_ft_ds)
+
+    tlds: list[tuple[tuple[np.ndarray, np.ndarray], float]] = []
+    with open(summary_path, encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            dataset_config = DATASET_CONFIGS[row["dataset"]]
+            model = TransferModel(
+                input_shape=dataset_config.image_shape,
+                num_classes=dataset_config.num_classes,
+            )
+            weights_path = os.path.join(
+                TLDS_DIR,
+                row["seed"],
+                ",".join(map(str, json.loads(row["labels"]))),
+                "tl_model",
+            )
+            model.load_weights(weights_path).expect_partial()
+            embedded_model = embed_model(model)
+            for embedded_ds, accuracy in [
+                (embedded_plants_ft_ds, float(row["plants_accuracy"])),
+                (embedded_birds_ft_ds, float(row["birds_accuracy"])),
+            ]:
+                tlds.append(((embedded_model, embedded_ds), accuracy))
+    return tlds
+
+
 class TLDSSequence(tf.keras.utils.Sequence):
     """Convert raw transfer learning dataset (TLDS) into trainable form."""
 
@@ -51,38 +85,6 @@ class TLDSSequence(tf.keras.utils.Sequence):
         """Get only the dataset's accuracies for the input batch index."""
         bslice = slice(idx * self.batch_size, (idx + 1) * self.batch_size)
         return self.arrays[2][bslice]
-
-
-def build_raw_tlds(
-    summary_path: str,
-) -> list[tuple[tuple[np.ndarray, np.ndarray], float]]:
-    """Build a raw version of the transfer-learning dataset."""
-    plants_ft_ds = tf.data.Dataset.load(PLANT_DISEASES_TRAIN_SAVE_DIR)
-    birds_ft_ds = tf.data.Dataset.load(BIRD_SPECIES_TRAIN_SAVE_DIR)
-
-    tlds: list[tuple[tuple[np.ndarray, np.ndarray], float]] = []
-    with open(summary_path, encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            dataset_config = DATASET_CONFIGS[row["dataset"]]
-            model = TransferModel(
-                input_shape=dataset_config.image_shape,
-                num_classes=dataset_config.num_classes,
-            )
-            weights_path = os.path.join(
-                TLDS_DIR,
-                row["seed"],
-                ",".join(map(str, json.loads(row["labels"]))),
-                "tl_model",
-            )
-            model.load_weights(weights_path).expect_partial()
-            embedded_model = embed_model(model)
-            for ds, accuracy in [
-                (plants_ft_ds, float(row["plants_accuracy"])),
-                (birds_ft_ds, float(row["birds_accuracy"])),
-            ]:
-                tlds.append(((embedded_model, embed_dataset(ds)), accuracy))
-    return tlds
 
 
 def train(args: argparse.Namespace) -> None:
