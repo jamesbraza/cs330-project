@@ -217,7 +217,7 @@ def main() -> None:
     parser.add_argument(
         "--ft_learning_rate",
         type=float,
-        default=1e-4,
+        default=1e-3,
         help="learning rate for fine-tuning",
     )
     parser.add_argument(
