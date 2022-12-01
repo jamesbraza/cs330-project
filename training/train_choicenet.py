@@ -36,11 +36,12 @@ def build_raw_tlds(
                 input_shape=dataset_config.image_shape,
                 num_classes=dataset_config.num_classes,
             )
+            try:
+                tl_model_folder = ",".join(map(str, json.loads(row["labels"])))
+            except json.decoder.JSONDecodeError:
+                tl_model_folder = row["labels"]
             weights_path = os.path.join(
-                TLDS_DIR,
-                row["seed"],
-                ",".join(map(str, json.loads(row["labels"]))),
-                "tl_model",
+                TLDS_DIR, row["seed"], tl_model_folder, "tl_model"
             )
             model.load_weights(weights_path).expect_partial()
             embedded_model = embed_model(model)
