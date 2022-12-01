@@ -277,6 +277,7 @@ fabric.properties
 
 # Datasets
 data/plant-diseases
+data/bird-species
 
 # Logs
 training/logs
