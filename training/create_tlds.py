@@ -126,6 +126,7 @@ def train(args: argparse.Namespace) -> None:
     model.build(input_shape=model.input_layer.input_shape[0])
 
     # Save results for randomly initialized model
+    model.save_weights(os.path.join(TLDS_DIR, str(args.seed), "randinit", "tl_model"))
     with open(args.tlds_csv_summary, mode="a", encoding="utf-8") as f:
         csv.writer(f).writerow(
             [args.dataset, args.seed, "randinit"] + compute_accuracy(model)
