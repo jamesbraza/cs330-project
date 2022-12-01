@@ -108,9 +108,14 @@ def train(args: argparse.Namespace) -> None:
 
     model.fit(training_dataseq)
     preds: np.ndarray = model.predict(test_dataseq)
-    accuracies: list[np.ndarray] = [
-        test_dataseq.get_accuracies(i) for i in range(len(test_dataseq))
-    ]
+    for i in range(len(test_dataseq)):
+        batch_preds = preds[:, i]
+        accuracies = test_dataseq.get_accuracies(i)
+        for pred, accuracy in zip(batch_preds, accuracies):
+            print(
+                f"Predicted accuracy {pred * 100:.3f}%, "
+                f"actual accuracy {accuracy * 100:.3f}%."
+            )
     _ = 0  # Debug here
 
 
