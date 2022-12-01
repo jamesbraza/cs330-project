@@ -63,13 +63,13 @@ def preprocess_ds_save(
 
 def train(args: argparse.Namespace) -> None:
     tf.random.set_seed(args.seed)
-    dataset_config = DATASET_CONFIGS[args.dataset]
 
     with open(args.tlds_csv_summary, mode="w", encoding="utf-8") as f:
         csv.writer(f).writerow(
             ["dataset", "seed", "labels", "plants_accuracy", "birds_accuracy"]
         )
 
+    dataset_config = DATASET_CONFIGS[args.dataset]
     plants_ft_ds, plants_test_ds, plants_labels = get_plant_diseases_datasets(
         num_train_batch=args.ft_num_batches,
         num_val_batch=args.test_num_batches,
