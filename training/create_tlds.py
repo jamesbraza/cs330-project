@@ -169,7 +169,7 @@ def train(args: argparse.Namespace) -> None:
     )
     for i, (dataset_name, dataset, labels) in enumerate(
         [(args.dataset, *v) for v in random_datasets]
-        + [("plants_village", *v) for v in plants_village_datasets]
+        + [("plant_village", *v) for v in plants_village_datasets]
         + [("bird-species", *v) for v in birds_random_datasets]
     ):
         labels_name = str(list(labels)).replace(" ", "")
@@ -253,7 +253,7 @@ def main() -> None:
     parser.add_argument(
         "--tl_num_batches",
         type=int,
-        default=math.ceil(3000 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(15e3 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in each transfer learning dataset",
     )
     parser.add_argument(
@@ -265,7 +265,7 @@ def main() -> None:
     parser.add_argument(
         "--ft_num_batches",
         type=int,
-        default=math.ceil(1000 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(2e3 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in the fine tuning dataset",
     )
     parser.add_argument(
@@ -277,7 +277,7 @@ def main() -> None:
     parser.add_argument(
         "--test_num_batches",
         type=int,
-        default=math.ceil(200 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(1e3 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in the test dataset",
     )
     parser.add_argument("--num_epochs", type=int, default=15, help="number of epochs")
