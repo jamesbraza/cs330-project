@@ -46,7 +46,7 @@ def preprocess_standardize(
 ) -> tf.data.Dataset:
     """Standardize images, convert labels to one-hot vector, and prefetch."""
 
-    def image_preprocessor(image):
+    def image_preprocessor(image: tf.Tensor) -> tf.Tensor:
         if image_size is not None and image.shape != image_size:
             if len(image_size) == 4:
                 _, h, w, _ = image_size
@@ -54,9 +54,7 @@ def preprocess_standardize(
                 h, w, _ = image_size
             else:
                 raise NotImplementedError(f"Unimplemented shape {image_size}.")
-            image = tf.image.resize_with_crop_or_pad(
-                image, target_height=h, target_width=w
-            )
+            image = tf.image.resize(image, target_height=h, target_width=w)
         return tf.image.per_image_standardization(image)
 
     return preprocess(
