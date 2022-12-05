@@ -6,6 +6,7 @@ import math
 import os
 from typing import TypeAlias
 
+import matplotlib.collections
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
@@ -133,15 +134,17 @@ def train_test(args: argparse.Namespace) -> None:
             )
 
     fig, ax = plt.subplots()
-    for label, data in all_results.items():
-        ax.scatter(*list(zip(*data)), label=f"{label} (x{len(data)})")
+    scatter_plots: dict[str, matplotlib.collections.Collection] = {
+        label: ax.scatter(*list(zip(*data)), label=f"{label} (x{len(data)})")
+        for label, data in all_results.items()
+    }
+    scatter_plots["rand init"].set_color("grey")
     x_lim, y_lim = ax.get_xlim(), ax.get_ylim()
     ax.plot([0, 1], [0, 1], color="grey", label="unit line")
     ax.set_xlim(x_lim)
     ax.set_ylim(y_lim)
     ax.set_xlabel("Actual Accuracy")
     ax.set_ylabel("Predicted Accuracy")
-    ax.set_title("TLDChoiceNet Performance Over Different TL Datasets")
     ax.grid()
     ax.legend()
     fig.tight_layout()
