@@ -169,7 +169,7 @@ def train(args: argparse.Namespace) -> None:
     )
     for i, (dataset_name, dataset, labels) in enumerate(
         [(args.dataset, *v) for v in random_datasets]
-        + [("plants_village", *v) for v in plants_village_datasets]
+        + [("plant_village", *v) for v in plants_village_datasets]
         + [("bird-species", *v) for v in birds_random_datasets]
     ):
         labels_name = str(list(labels)).replace(" ", "")

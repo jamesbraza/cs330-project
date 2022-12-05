@@ -43,7 +43,7 @@ def build_raw_tlds(
                     label = "random"
                 elif dataset_name == "bird-species":
                     label = "dissimilar"
-                elif dataset_name == "plants_village":
+                elif dataset_name == "plant_village":
                     label = "similar"
                 else:
                     raise NotImplementedError(f"Unspecified dataset {dataset_name}.")
