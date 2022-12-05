@@ -1,9 +1,12 @@
 import argparse
+import collections
 import csv
 import json
 import math
 import os
+from typing import TypeAlias
 
+import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
@@ -13,34 +16,50 @@ from models.core import ChoiceNetSimple, TransferModel
 from training import LOG_DIR, TLDS_DIR
 from training.create_tlds import DEFAULT_CSV_SUMMARY, PLANT_DISEASES_TRAIN_SAVE_DIR
 
+TLDataset: TypeAlias = list[tuple[str, tuple[np.ndarray, np.ndarray], float]]
+
 
 def build_raw_tlds(
     summary_path: str,
-) -> list[tuple[tuple[np.ndarray, np.ndarray], float]]:
+) -> TLDataset:
     """Build a raw version of the transfer-learning dataset."""
     plants_ft_ds = tf.data.Dataset.load(PLANT_DISEASES_TRAIN_SAVE_DIR)
     embedded_plants_ft_ds = embed_dataset(plants_ft_ds)
 
-    tlds: list[tuple[tuple[np.ndarray, np.ndarray], float]] = []
+    tlds: TLDataset = []
     with open(summary_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader):
+            dataset_name = row["dataset"]
             if i == 0:
-                dataset_config = DATASET_CONFIGS[row["dataset"]]
+                dataset_config = DATASET_CONFIGS[dataset_name]
                 model = TransferModel(
                     input_shape=dataset_config.image_shape,
                     num_classes=dataset_config.num_classes,
                 )
             try:
                 tl_model_folder = ",".join(map(str, json.loads(row["labels"])))
+                if dataset_name == "cifar100":
+                    label = "random"
+                elif dataset_name == "bird-species":
+                    label = "dissimilar"
+                elif dataset_name == "plants_village":
+                    label = "similar"
+                else:
+                    raise NotImplementedError(f"Unspecified dataset {dataset_name}.")
             except json.decoder.JSONDecodeError:
                 tl_model_folder = row["labels"]
+                label = "rand init"
             weights_path = os.path.join(
-                TLDS_DIR, row["seed"], row["dataset"], tl_model_folder, "tl_model"
+                TLDS_DIR, row["seed"], dataset_name, tl_model_folder, "tl_model"
             )
             model.load_weights(weights_path).expect_partial()
             tlds.append(
-                ((embed_model(model), embedded_plants_ft_ds), float(row["accuracy"]))
+                (
+                    label,
+                    (embed_model(model), embedded_plants_ft_ds),
+                    float(row["accuracy"]),
+                )
             )
     return tlds
 
@@ -50,20 +69,16 @@ class TLDSSequence(tf.keras.utils.Sequence):
 
     @classmethod
     def collate_arrays(
-        cls, dataset: list[tuple[tuple[np.ndarray, np.ndarray], float]]
+        cls, dataset: TLDataset
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Vertically stack embeddings and accuracies into stacked ndarrays."""
         flattened = [
-            (x[0][np.newaxis, :], x[1][np.newaxis, :], y) for (x, y) in dataset
+            (x[0][np.newaxis, :], x[1][np.newaxis, :], y) for (_, x, y) in dataset
         ]
         x0, x1, y = zip(*flattened)
         return np.vstack(x0), np.vstack(x1), np.array(y)
 
-    def __init__(
-        self,
-        dataset: list[tuple[tuple[np.ndarray, np.ndarray], float]],
-        batch_size: int = 32,
-    ):
+    def __init__(self, dataset: TLDataset, batch_size: int = 32):
         self.arrays = self.collate_arrays(dataset)
         self.batch_size = batch_size
 
@@ -80,7 +95,7 @@ class TLDSSequence(tf.keras.utils.Sequence):
         return self.arrays[2][bslice]
 
 
-def train(args: argparse.Namespace) -> None:
+def train_test(args: argparse.Namespace) -> None:
     tf.random.set_seed(args.seed)
 
     tlds = build_raw_tlds(summary_path=args.tlds_csv_summary)
@@ -103,14 +118,34 @@ def train(args: argparse.Namespace) -> None:
 
     model.fit(training_dataseq)
     preds: np.ndarray = model.predict(test_dataseq)
+
+    all_results: dict[str, list[tuple[float, float]]] = collections.defaultdict(list)
     for i in range(len(test_dataseq)):
         batch_preds = preds[:, i]
-        accuracies = test_dataseq.get_accuracies(i)
-        for j, (pred, accuracy) in enumerate(zip(batch_preds, accuracies)):
+        batch_accuracies = test_dataseq.get_accuracies(i)
+        for j, (pred, accuracy) in enumerate(zip(batch_preds, batch_accuracies)):
+            label = tlds[i * test_dataseq.batch_size + j][0]
+            all_results[label].append((accuracy, pred))
             print(
-                f"Example {i}.{j}: predicted accuracy {pred * 100:.3f}%, "
+                f"Example {i}.{j} with label {label}: "
+                f"predicted accuracy {pred * 100:.3f}%, "
                 f"actual accuracy {accuracy * 100:.3f}%."
             )
+
+    fig, ax = plt.subplots()
+    for label, data in all_results.items():
+        ax.scatter(*list(zip(*data)), label=f"{label} (x{len(data)})")
+    x_lim, y_lim = ax.get_xlim(), ax.get_ylim()
+    ax.plot([0, 1], [0, 1], color="grey", label="unit line")
+    ax.set_xlim(x_lim)
+    ax.set_ylim(y_lim)
+    ax.set_xlabel("Actual Accuracy")
+    ax.set_ylabel("Predicted Accuracy")
+    ax.set_title("TLDChoiceNet Performance Over Different TL Datasets")
+    ax.grid()
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig("choicenet_performance.png")
     _ = 0  # Debug here
 
 
@@ -149,7 +184,7 @@ def main() -> None:
     parser.add_argument(
         "--log_dir", type=str, default=LOG_DIR, help="log base directory"
     )
-    train(parser.parse_args())
+    train_test(parser.parse_args())
 
 
 if __name__ == "__main__":
