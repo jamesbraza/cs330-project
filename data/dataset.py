@@ -23,6 +23,8 @@ class DatasetMetadata(NamedTuple):
 DATASET_CONFIGS: dict[str, DatasetMetadata] = {
     "cifar10": DatasetMetadata("cifar10", 10, (32, 32, 3)),
     "cifar100": DatasetMetadata("cifar100", 100, (32, 32, 3)),
+    "bird-species": DatasetMetadata("bird-species", 450, (256, 256, 3)),
+    "plant_village": DatasetMetadata("plant_village", 38, (256, 256, 3)),
 }
 
 DEFAULT_SEED = 42
@@ -32,39 +34,49 @@ DEFAULT_BATCH_SIZE = 32
 ALL = -1
 
 
+def _batch_take(
+    dataset: tf.data.Dataset,
+    batch_size: int | None = DEFAULT_BATCH_SIZE,
+    num_batches: int = ALL,
+) -> tf.data.Dataset:
+    if batch_size is not None:
+        dataset = dataset.batch(batch_size)
+    return dataset.take(num_batches)
+
+
 def get_random_datasets(
-    dataset: str = "cifar100",
+    dataset: tf.data.Dataset,
     num_ds: int = DEFAULT_NUM_DATASETS,
     num_classes: int = DEFAULT_NUM_CLASSES,
-    batch_size: int = DEFAULT_BATCH_SIZE,
+    batch_size: int | None = DEFAULT_BATCH_SIZE,
     num_batches: int = ALL,
-    subset: str = "train",
     seed: int = DEFAULT_SEED,
 ) -> list[tuple[tf.data.Dataset, np.ndarray]]:
     """
     Get list of dataset, label pairings.
 
     Args:
-        dataset: Name of the TensorFlow dataset to load, default is CIFAR 100.
+        dataset: Base dataset to randomly sample from.
         num_ds: Number of datasets to fetch, default is 8.
         num_classes: Number of classes per dataset, default is 10.
         batch_size: Batch size to use in the random datasets.
+            If None, don't batch.
         num_batches: Number of batches to take, default fetches all.
-        subset: Subset to sample from, either train (default) or test.
         seed: Seed to use for getting random datasets.
 
     Returns:
         List of tuples of dataset, labels (int).
     """
-    full_ds = tfds.load(name=dataset, split=subset, as_supervised=True)
-    full_labels = np.fromiter(set(int(label) for _, label in full_ds), dtype=int)
+    full_labels = np.fromiter(set(int(label) for _, label in dataset), dtype=int)
     rng = np.random.default_rng(seed)
     labels = rng.choice(full_labels, size=(num_ds, num_classes), replace=False)
     return [
         (
-            full_ds.filter(lambda x, y, row=i: tf.reduce_any(y == labels[row]))
-            .batch(batch_size)
-            .take(num_batches),
+            _batch_take(
+                dataset.filter(lambda x, y, row=i: tf.reduce_any(y == labels[row])),
+                batch_size,
+                num_batches,
+            ),
             labels[i],
         )
         for i in range(num_ds)
@@ -72,30 +84,26 @@ def get_random_datasets(
 
 
 def get_dataset_subset(
+    dataset: tf.data.Dataset,
     labels: Sequence[int],
-    dataset: str = "cifar100",
-    batch_size: int = DEFAULT_BATCH_SIZE,
+    batch_size: int | None = DEFAULT_BATCH_SIZE,
     num_batches: int = ALL,
-    subset: str = "train",
 ) -> tf.data.Dataset:
     """
     Get the subset of a dataset corresponding to the input labels.
 
     Args:
+        dataset: Dataset to get a subset from.
         labels: Sequence of labels to fetch
-        dataset: Name of the TensorFlow dataset to load, default is CIFAR 100.
         batch_size: Batch size of the dataset.
+            If None, don't batch.
         num_batches: Number of batches to take, default fetches all.
-        subset: Subset to sample from, either train (default) or test.
 
     Returns:
         Matching dataset.
     """
-    full_ds = tfds.load(name=dataset, split=subset, as_supervised=True)
-    return (
-        full_ds.filter(lambda x, y: tf.reduce_any(y == labels))
-        .batch(batch_size)
-        .take(num_batches)
+    return _batch_take(
+        dataset.filter(lambda x, y: tf.reduce_any(y == labels)), batch_size, num_batches
     )
 
 
@@ -275,7 +283,8 @@ def preprocess(
 
 def main() -> None:
     """Play around with code here."""
-    labelled_datasets = get_random_datasets(num_batches=7)
+    dataset = tfds.load(name="plant_village", split="train", as_supervised=True)
+    labelled_datasets = get_random_datasets(dataset, num_batches=7)
     for ds, labels in labelled_datasets:
         for image, label in ds:
             _ = 0  # Debug here

@@ -3,8 +3,11 @@ import csv
 import math
 import os
 import shutil
+from collections.abc import Callable
+from functools import partial
 
 import tensorflow as tf
+import tensorflow_datasets as tfds
 
 from data import DATA_DIR
 from data.dataset import (
@@ -15,11 +18,12 @@ from data.dataset import (
     DEFAULT_NUM_DATASETS,
     DEFAULT_SEED,
     PLANT_DISEASES_REL_PATH,
+    Shape,
     get_bird_species_datasets,
+    get_dataset_subset,
     get_plant_diseases_datasets,
     get_random_datasets,
     preprocess,
-    split,
 )
 from models import MODEL_SAVE_DIR
 from models.core import TransferModel
@@ -35,26 +39,37 @@ BIRD_SPECIES_TRAIN_SAVE_DIR = os.path.join(
 
 
 def preprocess_standardize(
-    ds: tf.data.Dataset, num_classes: int, prefetch_size: int = tf.data.AUTOTUNE
+    ds: tf.data.Dataset,
+    num_classes: int,
+    image_size: Shape | None = None,
+    prefetch_size: int = tf.data.AUTOTUNE,
 ) -> tf.data.Dataset:
     """Standardize images, convert labels to one-hot vector, and prefetch."""
+
+    def image_preprocessor(image: tf.Tensor) -> tf.Tensor:
+        if image_size is not None and image.shape != image_size:
+            if len(image_size) == 4:
+                _, *hw, _ = image_size
+            elif len(image_size) == 3:
+                hw, _ = image_size
+            else:
+                raise NotImplementedError(f"Unimplemented shape {image_size}.")
+            image = tf.image.resize(image, size=hw)
+        return tf.image.per_image_standardization(image)
+
     return preprocess(
-        ds,
-        num_classes=num_classes,
-        image_preprocessor=tf.image.per_image_standardization,
+        ds, num_classes=num_classes, image_preprocessor=image_preprocessor
     ).prefetch(prefetch_size)
 
 
 def preprocess_ds_save(
     ft_ds: tf.data.Dataset,
     test_ds: tf.data.Dataset,
-    num_classes: int,
+    preprocessor: Callable[[tf.data.Dataset], tf.data.Dataset],
     ft_ds_save_dir: str,
 ) -> tuple[tf.data.Dataset, tf.data.Dataset]:
     """Preprocess both fine-tuning and test datasets, saving the fine-tuning dataset."""
-    ft_ds, test_ds = (
-        preprocess_standardize(ds, num_classes=num_classes) for ds in (ft_ds, test_ds)
-    )
+    ft_ds, test_ds = (preprocessor(ds) for ds in (ft_ds, test_ds))
     if os.path.exists(ft_ds_save_dir):
         shutil.rmtree(ft_ds_save_dir)  # Only persist one dataset
     ft_ds.save(ft_ds_save_dir)
@@ -65,9 +80,7 @@ def train(args: argparse.Namespace) -> None:
     tf.random.set_seed(args.seed)
 
     with open(args.tlds_csv_summary, mode="w", encoding="utf-8") as f:
-        csv.writer(f).writerow(
-            ["dataset", "seed", "labels", "plants_accuracy", "birds_accuracy"]
-        )
+        csv.writer(f).writerow(["dataset", "seed", "labels", "accuracy"])
 
     dataset_config = DATASET_CONFIGS[args.dataset]
     plants_ft_ds, plants_test_ds, plants_labels = get_plant_diseases_datasets(
@@ -80,56 +93,44 @@ def train(args: argparse.Namespace) -> None:
     plants_ft_ds, plants_test_ds = preprocess_ds_save(
         plants_ft_ds,
         plants_test_ds,
-        num_classes=len(plants_labels),
+        preprocessor=partial(preprocess_standardize, num_classes=len(plants_labels)),
         ft_ds_save_dir=PLANT_DISEASES_TRAIN_SAVE_DIR,
     )
-    birds_ft_ds, birds_test_ds, birds_labels = get_bird_species_datasets(
-        num_train_batch=args.ft_num_batches,
-        num_val_batch=args.test_num_batches,
-        seed=args.seed,
-        batch_size=args.batch_size,
-        image_size=dataset_config.image_shape[:-1],
-    )
-    birds_ft_ds, birds_test_ds = preprocess_ds_save(
-        birds_ft_ds,
-        birds_test_ds,
-        num_classes=len(birds_labels),
-        ft_ds_save_dir=BIRD_SPECIES_TRAIN_SAVE_DIR,
-    )
 
-    def compute_accuracy(tl_model: tf.keras.Model) -> list[float]:
-        accuracies: list[float] = []
-        for (ft_ds, test_ds, num_classes) in [
-            (plants_ft_ds, plants_test_ds, len(plants_labels)),
-            (birds_ft_ds, birds_test_ds, len(birds_labels)),
-        ]:
-            new_model = tl_model.clone(new_num_classes=num_classes)
-            new_model.layer1.trainable = False
-            new_model.layer2.trainable = False
+    def compute_accuracy(tl_model: TransferModel) -> float:
+        new_model = tl_model.clone(new_num_classes=len(plants_labels))
+        new_model.layer1.trainable = False
+        new_model.layer2.trainable = False
 
-            # NOTE: reset the optimizer before fine-tuning
-            new_model.compile(
-                optimizer=tf.keras.optimizers.Adam(learning_rate=args.ft_learning_rate),
-                loss="categorical_crossentropy",
-                metrics=["accuracy"],
-            )
+        # NOTE: reset the optimizer before fine-tuning
+        new_model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=args.ft_learning_rate),
+            loss="categorical_crossentropy",
+            metrics=["accuracy"],
+        )
 
-            new_model.fit(ft_ds, epochs=args.num_epochs)
-            _, accuracy = new_model.evaluate(test_ds)
-            accuracies.append(accuracy)
-        return accuracies
+        new_model.fit(plants_ft_ds, epochs=args.num_epochs)
+        _, accuracy = new_model.evaluate(plants_test_ds)
+        return accuracy
 
     model = TransferModel(
         input_shape=dataset_config.image_shape, num_classes=dataset_config.num_classes
     )
     # Build to populate weights for Checkpoint
     model.build(input_shape=model.input_layer.input_shape[0])
+    dataset_preprocessor = partial(
+        preprocess_standardize,
+        num_classes=model.dense.units,
+        image_size=(None, *dataset_config.image_shape),
+    )
 
     # Save results for randomly initialized model
-    model.save_weights(os.path.join(TLDS_DIR, str(args.seed), "randinit", "tl_model"))
+    model.save_weights(
+        os.path.join(TLDS_DIR, str(args.seed), args.dataset, "randinit", "tl_model")
+    )
     with open(args.tlds_csv_summary, mode="a", encoding="utf-8") as f:
         csv.writer(f).writerow(
-            [args.dataset, args.seed, "randinit"] + compute_accuracy(model)
+            [args.dataset, args.seed, "randinit", compute_accuracy(model)]
         )
 
     # 1. Save randomly initialized weights to begin training with the same state
@@ -139,20 +140,42 @@ def train(args: argparse.Namespace) -> None:
         saved_path = random_init_checkpoint.save(random_init_path)
         assert saved_path == f"{random_init_path}-1"
 
-    for i, (dataset, labels) in enumerate(
-        get_random_datasets(
-            dataset=dataset_config.name,
-            num_ds=args.tl_num_datasets,
-            num_classes=args.tl_num_classes,
-            batch_size=args.batch_size,
-            num_batches=args.tl_num_batches,
-            seed=args.seed,
-        )
+    kwargs = {
+        "num_classes": args.tl_num_classes,
+        "batch_size": args.batch_size,
+        "num_batches": args.tl_num_batches,
+        "seed": args.seed,
+    }
+    random_datasets = get_random_datasets(
+        dataset=tfds.load(name=args.dataset, split="train", as_supervised=True),
+        num_ds=args.tl_num_random_datasets,
+        **kwargs,
+    )
+    plants_village_datasets = get_random_datasets(
+        dataset=tfds.load(name="plant_village", split="train", as_supervised=True),
+        num_ds=args.tl_num_similar_datasets,
+        **kwargs,
+    )
+    # Don't batch yet, let get_random_datasets batch
+    birds_train_ds = get_dataset_subset(
+        dataset=get_bird_species_datasets(
+            seed=args.seed, batch_size=None, image_size=dataset_config.image_shape[:-1]
+        )[0],
+        labels=list(range(model.dense.units)),
+        batch_size=None,
+    )
+    birds_random_datasets = get_random_datasets(
+        dataset=birds_train_ds, num_ds=args.tl_num_dissimilar_datasets, **kwargs
+    )
+    for i, (dataset_name, dataset, labels) in enumerate(
+        [(args.dataset, *v) for v in random_datasets]
+        + [("plants_village", *v) for v in plants_village_datasets]
+        + [("bird-species", *v) for v in birds_random_datasets]
     ):
         labels_name = str(list(labels)).replace(" ", "")
         # Keras can't handle [] per https://github.com/keras-team/keras/issues/17265
         labels_path = labels_name[1:-1]
-        base_tl_path = os.path.join(TLDS_DIR, str(args.seed), labels_path)
+        base_tl_path = os.path.join(TLDS_DIR, str(args.seed), dataset_name, labels_path)
 
         # 2. Load randomly initialized weights
         random_init_checkpoint.restore(f"{random_init_path}-1")
@@ -163,15 +186,11 @@ def train(args: argparse.Namespace) -> None:
         )
 
         # 3. Perform the transfer learning
-        train_ds, val_ds = (
-            preprocess_standardize(ds, num_classes=dataset_config.num_classes)
-            for ds in split(dataset)
-        )
+        train_ds = dataset_preprocessor(dataset)
         train_ds.save(os.path.join(base_tl_path, "tl_dataset"))
         model.fit(
             train_ds,
             epochs=args.num_epochs,
-            validation_data=val_ds,
             callbacks=[
                 tf.keras.callbacks.TensorBoard(
                     log_dir=os.path.join(
@@ -186,7 +205,7 @@ def train(args: argparse.Namespace) -> None:
         # 4. Perform fine-tuning, testing, and save the accuracy
         with open(args.tlds_csv_summary, mode="a", encoding="utf-8") as f:
             csv.writer(f).writerow(
-                [args.dataset, args.seed, labels_name] + compute_accuracy(model)
+                [dataset_name, args.seed, labels_name, compute_accuracy(model)]
             )
 
     _ = 0  # Debug here
@@ -208,10 +227,22 @@ def main() -> None:
         "-d", "--dataset", type=str, default="cifar100", help="source dataset name"
     )
     parser.add_argument(
-        "--tl_num_datasets",
+        "--tl_num_random_datasets",
         type=int,
         default=DEFAULT_NUM_DATASETS,
-        help="number of transfer learning datasets to sample",
+        help="number of random_transfer learning datasets to sample",
+    )
+    parser.add_argument(
+        "--tl_num_similar_datasets",
+        type=int,
+        default=3,
+        help="number of similar transfer learning datasets to sample",
+    )
+    parser.add_argument(
+        "--tl_num_dissimilar_datasets",
+        type=int,
+        default=3,
+        help="number of dissimilar transfer learning datasets to sample",
     )
     parser.add_argument(
         "--tl_num_classes",
