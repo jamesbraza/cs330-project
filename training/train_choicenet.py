@@ -11,11 +11,7 @@ from data.dataset import DATASET_CONFIGS, DEFAULT_BATCH_SIZE, DEFAULT_SEED
 from embedding.embed import embed_dataset, embed_model
 from models.core import ChoiceNetSimple, TransferModel
 from training import LOG_DIR, TLDS_DIR
-from training.create_tlds import (
-    BIRD_SPECIES_TRAIN_SAVE_DIR,
-    DEFAULT_CSV_SUMMARY,
-    PLANT_DISEASES_TRAIN_SAVE_DIR,
-)
+from training.create_tlds import DEFAULT_CSV_SUMMARY, PLANT_DISEASES_TRAIN_SAVE_DIR
 
 
 def build_raw_tlds(
@@ -24,32 +20,28 @@ def build_raw_tlds(
     """Build a raw version of the transfer-learning dataset."""
     plants_ft_ds = tf.data.Dataset.load(PLANT_DISEASES_TRAIN_SAVE_DIR)
     embedded_plants_ft_ds = embed_dataset(plants_ft_ds)
-    birds_ft_ds = tf.data.Dataset.load(BIRD_SPECIES_TRAIN_SAVE_DIR)
-    embedded_birds_ft_ds = embed_dataset(birds_ft_ds)
 
     tlds: list[tuple[tuple[np.ndarray, np.ndarray], float]] = []
     with open(summary_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        for row in reader:
-            dataset_config = DATASET_CONFIGS[row["dataset"]]
-            model = TransferModel(
-                input_shape=dataset_config.image_shape,
-                num_classes=dataset_config.num_classes,
-            )
+        for i, row in enumerate(reader):
+            if i == 0:
+                dataset_config = DATASET_CONFIGS[row["dataset"]]
+                model = TransferModel(
+                    input_shape=dataset_config.image_shape,
+                    num_classes=dataset_config.num_classes,
+                )
             try:
                 tl_model_folder = ",".join(map(str, json.loads(row["labels"])))
             except json.decoder.JSONDecodeError:
                 tl_model_folder = row["labels"]
             weights_path = os.path.join(
-                TLDS_DIR, row["seed"], tl_model_folder, "tl_model"
+                TLDS_DIR, row["seed"], row["dataset"], tl_model_folder, "tl_model"
             )
             model.load_weights(weights_path).expect_partial()
-            embedded_model = embed_model(model)
-            for embedded_ds, accuracy in [
-                (embedded_plants_ft_ds, float(row["plants_accuracy"])),
-                (embedded_birds_ft_ds, float(row["birds_accuracy"])),
-            ]:
-                tlds.append(((embedded_model, embedded_ds), accuracy))
+            tlds.append(
+                ((embed_model(model), embedded_plants_ft_ds), float(row["accuracy"]))
+            )
     return tlds
 
 
@@ -93,12 +85,14 @@ def train(args: argparse.Namespace) -> None:
 
     tlds = build_raw_tlds(summary_path=args.tlds_csv_summary)
     num_training_ds = int(len(tlds) * (1 - args.validation_split))
-    if num_training_ds >= len(tlds):
-        raise ValueError(
-            f"Split {args.validation_split} results in an empty test dataset."
+    if num_training_ds >= len(tlds):  # Reuse training ds as test ds
+        training_dataseq = TLDSSequence(tlds, batch_size=args.batch_size)
+        test_dataseq = training_dataseq
+    else:
+        training_dataseq = TLDSSequence(
+            tlds[:num_training_ds], batch_size=args.batch_size
         )
-    training_dataseq = TLDSSequence(tlds[:num_training_ds], batch_size=args.batch_size)
-    test_dataseq = TLDSSequence(tlds[num_training_ds:], batch_size=args.batch_size)
+        test_dataseq = TLDSSequence(tlds[num_training_ds:], batch_size=args.batch_size)
 
     model = ChoiceNetSimple()
     model.compile(
@@ -112,9 +106,9 @@ def train(args: argparse.Namespace) -> None:
     for i in range(len(test_dataseq)):
         batch_preds = preds[:, i]
         accuracies = test_dataseq.get_accuracies(i)
-        for pred, accuracy in zip(batch_preds, accuracies):
+        for j, (pred, accuracy) in enumerate(zip(batch_preds, accuracies)):
             print(
-                f"Predicted accuracy {pred * 100:.3f}%, "
+                f"Example {i}.{j}: predicted accuracy {pred * 100:.3f}%, "
                 f"actual accuracy {accuracy * 100:.3f}%."
             )
     _ = 0  # Debug here
@@ -143,7 +137,7 @@ def main() -> None:
     parser.add_argument(
         "--validation_split",
         type=float,
-        default=0.3,
+        default=0.0,
         help="fraction of transfer learning datasets to use for validation",
     )
     parser.add_argument(
