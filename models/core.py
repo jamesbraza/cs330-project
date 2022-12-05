@@ -71,9 +71,9 @@ class TransferModel(tf.keras.Model):
         """
         with tempfile.NamedTemporaryFile(suffix=".h5") as fp:
             self.save_weights(fp.name)
-            input_shape = self.input_layer.input_shape[0]
+            (input_shape,) = self.input_layer.input_shape
             copied_model = type(self)(
-                input_shape=input_shape,
+                input_shape=input_shape[1:],  # Leave off batch dimension
                 num_classes=self.dense.units,
             )
             copied_model.build(input_shape=input_shape)
