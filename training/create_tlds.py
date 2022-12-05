@@ -3,6 +3,7 @@ import csv
 import math
 import os
 import shutil
+from collections.abc import Callable
 from functools import partial
 
 import tensorflow as tf
@@ -23,7 +24,6 @@ from data.dataset import (
     get_plant_diseases_datasets,
     get_random_datasets,
     preprocess,
-    split,
 )
 from models import MODEL_SAVE_DIR
 from models.core import TransferModel
@@ -49,12 +49,12 @@ def preprocess_standardize(
     def image_preprocessor(image: tf.Tensor) -> tf.Tensor:
         if image_size is not None and image.shape != image_size:
             if len(image_size) == 4:
-                _, h, w, _ = image_size
+                _, *hw, _ = image_size
             elif len(image_size) == 3:
-                h, w, _ = image_size
+                hw, _ = image_size
             else:
                 raise NotImplementedError(f"Unimplemented shape {image_size}.")
-            image = tf.image.resize(image, target_height=h, target_width=w)
+            image = tf.image.resize(image, size=hw)
         return tf.image.per_image_standardization(image)
 
     return preprocess(
@@ -65,13 +65,11 @@ def preprocess_standardize(
 def preprocess_ds_save(
     ft_ds: tf.data.Dataset,
     test_ds: tf.data.Dataset,
-    num_classes: int,
+    preprocessor: Callable[[tf.data.Dataset], tf.data.Dataset],
     ft_ds_save_dir: str,
 ) -> tuple[tf.data.Dataset, tf.data.Dataset]:
     """Preprocess both fine-tuning and test datasets, saving the fine-tuning dataset."""
-    ft_ds, test_ds = (
-        preprocess_standardize(ds, num_classes=num_classes) for ds in (ft_ds, test_ds)
-    )
+    ft_ds, test_ds = (preprocessor(ds) for ds in (ft_ds, test_ds))
     if os.path.exists(ft_ds_save_dir):
         shutil.rmtree(ft_ds_save_dir)  # Only persist one dataset
     ft_ds.save(ft_ds_save_dir)
@@ -95,11 +93,11 @@ def train(args: argparse.Namespace) -> None:
     plants_ft_ds, plants_test_ds = preprocess_ds_save(
         plants_ft_ds,
         plants_test_ds,
-        num_classes=len(plants_labels),
+        preprocessor=partial(preprocess_standardize, num_classes=len(plants_labels)),
         ft_ds_save_dir=PLANT_DISEASES_TRAIN_SAVE_DIR,
     )
 
-    def compute_accuracy(tl_model: tf.keras.Model) -> float:
+    def compute_accuracy(tl_model: TransferModel) -> float:
         new_model = tl_model.clone(new_num_classes=len(plants_labels))
         new_model.layer1.trainable = False
         new_model.layer2.trainable = False
@@ -188,12 +186,11 @@ def train(args: argparse.Namespace) -> None:
         )
 
         # 3. Perform the transfer learning
-        train_ds, val_ds = (dataset_preprocessor(ds) for ds in split(dataset))
+        train_ds = dataset_preprocessor(dataset)
         train_ds.save(os.path.join(base_tl_path, "tl_dataset"))
         model.fit(
             train_ds,
             epochs=args.num_epochs,
-            validation_data=val_ds,
             callbacks=[
                 tf.keras.callbacks.TensorBoard(
                     log_dir=os.path.join(
