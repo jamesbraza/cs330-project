@@ -13,7 +13,7 @@ import tensorflow as tf
 
 from data.dataset import DATASET_CONFIGS, DEFAULT_BATCH_SIZE, DEFAULT_SEED
 from embedding.embed import embed_dataset, embed_model
-from models.core import ChoiceNetSimple, TransferModel
+from models.core import ChoiceNetv1, TransferModel
 from training import LOG_DIR, TLDS_DIR
 from training.create_tlds import DEFAULT_CSV_SUMMARY, PLANT_DISEASES_TRAIN_SAVE_DIR
 
@@ -110,7 +110,7 @@ def train_test(args: argparse.Namespace) -> None:
         )
         test_dataseq = TLDSSequence(tlds[num_training_ds:], batch_size=args.batch_size)
 
-    model = ChoiceNetSimple()
+    model = ChoiceNetv1()
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
         loss="mse",
@@ -148,12 +148,12 @@ def train_test(args: argparse.Namespace) -> None:
     ax.grid()
     ax.legend()
     fig.tight_layout()
-    fig.savefig("choicenet_performance.png")
+    fig.savefig("choicenet_v1_performance.png")
     _ = 0  # Debug here
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train ChoiceNet")
+    parser = argparse.ArgumentParser(description="Train ChoiceNet v1")
     parser.add_argument(
         "-s", "--seed", type=int, default=DEFAULT_SEED, help="random seed"
     )

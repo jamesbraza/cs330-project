@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 import numpy as np
 import tensorflow as tf
 
-from models.core import ChoiceNetSimple
+from models.core import ChoiceNetv1
 
 
 def train_model(args):
@@ -29,7 +29,7 @@ def train_model(args):
     Y_val = Y_matrix[-1:]
     X_val2 = X_input2[-1:]
 
-    model = ChoiceNetSimple()
+    model = ChoiceNetv1()
 
     opt = tf.keras.optimizers.Adam(learning_rate=args.learning_rate)
     model.compile(

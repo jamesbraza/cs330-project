@@ -100,7 +100,7 @@ class ReduceMatrix(tf.keras.Model):
         return tf.matmul(inputs, self.A)
 
 
-class ChoiceNetSimple(tf.keras.Model):
+class ChoiceNetv1(tf.keras.Model):
     REDUCE_FILTER_DIM = TransferModel.LAYER_3_NUM_FILTERS * math.prod(
         TransferModel.KERNEL_SIZE
     )

@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from embedding.td_pre_process_weight import get_weight_matrix_input
-from models.core import ChoiceNetSimple
+from models.core import ChoiceNetv1
 from training import LOG_DIR
 
 
@@ -26,7 +26,7 @@ def train_model(args):
     Y_train = Y_weight[:2]
     Y_val = Y_weight[2:3]
 
-    model = ChoiceNetSimple()
+    model = ChoiceNetv1()
 
     opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
