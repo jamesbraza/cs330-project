@@ -3,7 +3,7 @@ import csv
 import math
 import os
 import shutil
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from functools import partial
 
 import tensorflow as tf
@@ -20,7 +20,6 @@ from data.dataset import (
     PLANT_LEAVES_REL_PATH,
     Shape,
     get_bird_species_datasets,
-    get_dataset_subset,
     get_plant_leaves_datasets,
     get_random_datasets,
     preprocess,
@@ -44,6 +43,7 @@ BIRD_SPECIES_TRAIN_SAVE_DIR = os.path.join(
 def preprocess_standardize(
     ds: tf.data.Dataset,
     num_classes: int,
+    labels: Sequence[int] | None = None,
     image_size: Shape | None = None,
     prefetch_size: int = tf.data.AUTOTUNE,
 ) -> tf.data.Dataset:
@@ -63,7 +63,23 @@ def preprocess_standardize(
     def label_preprocessor(label: tf.Tensor) -> tf.Tensor:
         return tf.one_hot(label, depth=num_classes)
 
-    return preprocess(ds, image_preprocessor, label_preprocessor).prefetch(
+    if labels is not None:
+        labels_tensor = tf.constant(labels)
+        mapped_labels_tensor = tf.constant([i for i in range(len(labels))])
+        labels_map = tf.lookup.StaticHashTable(
+            tf.lookup.KeyValueTensorInitializer(labels_tensor, mapped_labels_tensor),
+            default_value=-1,
+        )
+
+        def label_remapping_preprocessor(label: tf.Tensor) -> tf.Tensor:
+            """Remap labels to be in the range of the number of labels."""
+            return label_preprocessor(labels_map.lookup(label))
+
+        labels_preprocessor = label_remapping_preprocessor
+    else:
+        labels_preprocessor = label_preprocessor
+
+    return preprocess(ds, image_preprocessor, labels_preprocessor).prefetch(
         prefetch_size
     )
 
@@ -123,18 +139,10 @@ def train(args: argparse.Namespace) -> None:
 
     model = TransferModel(
         input_shape=dataset_config.image_shape,
-        num_classes=min(
-            dataset_config.num_classes,
-            args.tl_num_random_imagenet_datasets * args.tl_num_classes,
-        ),
+        num_classes=args.tl_num_classes,
     )
     # Build to populate weights for Checkpoint
     model.build(input_shape=model.input_layer.input_shape[0])
-    dataset_preprocessor = partial(
-        preprocess_standardize,
-        num_classes=model.dense.units,
-        image_size=(None, *dataset_config.image_shape),
-    )
 
     # Save results for randomly initialized model
     model.save_weights(
@@ -164,10 +172,8 @@ def train(args: argparse.Namespace) -> None:
         **kwargs,
     )
     imagenet_random_datasets = get_random_datasets(
-        dataset=get_dataset_subset(
-            tfds.load(name="imagenet_resized/32x32", split="train", as_supervised=True),
-            labels=list(range(model.dense.units)),
-            batch_size=None,
+        dataset=tfds.load(
+            name="imagenet_resized/32x32", split="train", as_supervised=True
         ),
         num_ds=args.tl_num_random_imagenet_datasets,
         **kwargs,
@@ -177,16 +183,12 @@ def train(args: argparse.Namespace) -> None:
         num_ds=args.tl_num_similar_datasets,
         **kwargs,
     )
-    # Don't batch yet, let get_random_datasets batch
-    birds_train_ds = get_dataset_subset(
+    birds_random_datasets = get_random_datasets(
         dataset=get_bird_species_datasets(
             seed=args.seed, batch_size=None, image_size=dataset_config.image_shape[:-1]
         )[0],
-        labels=list(range(model.dense.units)),
-        batch_size=None,
-    )
-    birds_random_datasets = get_random_datasets(
-        dataset=birds_train_ds, num_ds=args.tl_num_dissimilar_datasets, **kwargs
+        num_ds=args.tl_num_dissimilar_datasets,
+        **kwargs,
     )
     for i, (dataset_name, dataset, labels) in enumerate(
         [("cifar100", *v) for v in cifar100_random_datasets]
@@ -208,6 +210,12 @@ def train(args: argparse.Namespace) -> None:
         )
 
         # 3. Perform the transfer learning
+        dataset_preprocessor = partial(
+            preprocess_standardize,
+            num_classes=model.dense.units,
+            labels=labels,
+            image_size=(None, *dataset_config.image_shape),
+        )
         train_ds = dataset_preprocessor(dataset)
         train_ds.save(os.path.join(base_tl_path, "tl_dataset"))
         model.fit(
