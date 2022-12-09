@@ -86,7 +86,7 @@ def train(args: argparse.Namespace) -> None:
     with open(args.tlds_csv_summary, mode="w", encoding="utf-8") as f:
         csv.writer(f).writerow(["dataset", "seed", "labels", "accuracy"])
 
-    dataset_config = DATASET_CONFIGS[args.dataset]
+    dataset_config = DATASET_CONFIGS["cifar100"]
     plants_ft_ds, plants_test_ds, plants_labels = get_plant_leaves_datasets(
         num_train_batch=args.ft_num_batches,
         num_val_batch=args.test_num_batches,
@@ -132,11 +132,11 @@ def train(args: argparse.Namespace) -> None:
 
     # Save results for randomly initialized model
     model.save_weights(
-        os.path.join(TLDS_DIR, str(args.seed), args.dataset, "randinit", "tl_model")
+        os.path.join(TLDS_DIR, str(args.seed), "cifar100", "randinit", "tl_model")
     )
     with open(args.tlds_csv_summary, mode="a", encoding="utf-8") as f:
         csv.writer(f).writerow(
-            [args.dataset, args.seed, "randinit", compute_accuracy(model)]
+            ["cifar100", args.seed, "randinit", compute_accuracy(model)]
         )
 
     # 1. Save randomly initialized weights to begin training with the same state
@@ -152,8 +152,15 @@ def train(args: argparse.Namespace) -> None:
         "num_batches": args.tl_num_batches,
         "seed": args.seed,
     }
-    random_datasets = get_random_datasets(
-        dataset=tfds.load(name=args.dataset, split="train", as_supervised=True),
+    cifar100_random_datasets = get_random_datasets(
+        dataset=tfds.load(name="cifar100", split="train", as_supervised=True),
+        num_ds=args.tl_num_random_datasets,
+        **kwargs,
+    )
+    imagenet_random_datasets = get_random_datasets(
+        dataset=tfds.load(
+            name="imagenet_resized/32x32", split="train", as_supervised=True
+        ),
         num_ds=args.tl_num_random_datasets,
         **kwargs,
     )
@@ -174,7 +181,8 @@ def train(args: argparse.Namespace) -> None:
         dataset=birds_train_ds, num_ds=args.tl_num_dissimilar_datasets, **kwargs
     )
     for i, (dataset_name, dataset, labels) in enumerate(
-        [(args.dataset, *v) for v in random_datasets]
+        [("cifar100", *v) for v in cifar100_random_datasets]
+        + [("imagenet_resized/32x32", *v) for v in imagenet_random_datasets]
         + [("plant_village", *v) for v in plants_village_datasets]
         + [("bird-species", *v) for v in birds_random_datasets]
     ):
@@ -228,9 +236,6 @@ def main() -> None:
         type=int,
         default=DEFAULT_BATCH_SIZE,
         help="batch size during transfer learning, fine tuning, and prediction",
-    )
-    parser.add_argument(
-        "-d", "--dataset", type=str, default="cifar100", help="source dataset name"
     )
     parser.add_argument(
         "--tl_num_random_datasets",
