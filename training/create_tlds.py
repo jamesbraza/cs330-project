@@ -15,7 +15,6 @@ from data.dataset import (
     DATASET_CONFIGS,
     DEFAULT_BATCH_SIZE,
     DEFAULT_NUM_CLASSES,
-    DEFAULT_NUM_DATASETS,
     DEFAULT_SEED,
     PLANT_DISEASES_REL_PATH,
     PLANT_LEAVES_REL_PATH,
@@ -154,14 +153,14 @@ def train(args: argparse.Namespace) -> None:
     }
     cifar100_random_datasets = get_random_datasets(
         dataset=tfds.load(name="cifar100", split="train", as_supervised=True),
-        num_ds=args.tl_num_random_datasets,
+        num_ds=args.tl_num_random_cifar100_datasets,
         **kwargs,
     )
     imagenet_random_datasets = get_random_datasets(
         dataset=tfds.load(
             name="imagenet_resized/32x32", split="train", as_supervised=True
         ),
-        num_ds=args.tl_num_random_datasets,
+        num_ds=args.tl_num_random_imagenet_datasets,
         **kwargs,
     )
     plants_village_datasets = get_random_datasets(
@@ -238,10 +237,16 @@ def main() -> None:
         help="batch size during transfer learning, fine tuning, and prediction",
     )
     parser.add_argument(
-        "--tl_num_random_datasets",
+        "--tl_num_random_cifar100_datasets",
         type=int,
-        default=DEFAULT_NUM_DATASETS,
-        help="number of random_transfer learning datasets to sample",
+        default=10,
+        help="number of random transfer learning datasets to sample from CIFAR100",
+    )
+    parser.add_argument(
+        "--tl_num_random_imagenet_datasets",
+        type=int,
+        default=30,
+        help="number of random transfer learning datasets to sample from ImageNet",
     )
     parser.add_argument(
         "--tl_num_similar_datasets",
