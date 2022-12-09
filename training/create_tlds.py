@@ -85,7 +85,7 @@ def train(args: argparse.Namespace) -> None:
     with open(args.tlds_csv_summary, mode="w", encoding="utf-8") as f:
         csv.writer(f).writerow(["dataset", "seed", "labels", "accuracy"])
 
-    dataset_config = DATASET_CONFIGS["cifar100"]
+    dataset_config = DATASET_CONFIGS["imagenet_resized/32x32"]
     plants_ft_ds, plants_test_ds, plants_labels = get_plant_leaves_datasets(
         num_train_batch=args.ft_num_batches,
         num_val_batch=args.test_num_batches,
@@ -119,7 +119,11 @@ def train(args: argparse.Namespace) -> None:
         return accuracy
 
     model = TransferModel(
-        input_shape=dataset_config.image_shape, num_classes=dataset_config.num_classes
+        input_shape=dataset_config.image_shape,
+        num_classes=min(
+            dataset_config.num_classes,
+            args.tl_num_random_imagenet_datasets * args.tl_num_classes,
+        ),
     )
     # Build to populate weights for Checkpoint
     model.build(input_shape=model.input_layer.input_shape[0])
@@ -157,8 +161,10 @@ def train(args: argparse.Namespace) -> None:
         **kwargs,
     )
     imagenet_random_datasets = get_random_datasets(
-        dataset=tfds.load(
-            name="imagenet_resized/32x32", split="train", as_supervised=True
+        dataset=get_dataset_subset(
+            tfds.load(name="imagenet_resized/32x32", split="train", as_supervised=True),
+            labels=list(range(model.dense.units)),
+            batch_size=None,
         ),
         num_ds=args.tl_num_random_imagenet_datasets,
         **kwargs,
