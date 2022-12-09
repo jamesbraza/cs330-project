@@ -26,6 +26,9 @@ DATASET_CONFIGS: dict[str, DatasetMetadata] = {
     "bird-species": DatasetMetadata("bird-species", 450, (256, 256, 3)),
     "plant_village": DatasetMetadata("plant_village", 38, (256, 256, 3)),
     "plant-leaves": DatasetMetadata("plant-leaves", 22, (6000, 4000, 3)),
+    "imagenet_resized/32x32": DatasetMetadata(
+        "imagenet_resized/32x32", 1000, (32, 32, 3)
+    ),
 }
 
 DEFAULT_SEED = 42
@@ -43,6 +46,16 @@ def _batch_take(
     if batch_size is not None:
         dataset = dataset.batch(batch_size)
     return dataset.take(num_batches)
+
+
+def get_all_labels(dataset: tf.data.Dataset) -> np.ndarray:
+    """
+    Get all labels in a dataset.
+
+    NOTE: labels should be integer values.
+    NOTE: this traverses the entire dataset, so it's pretty lame.
+    """
+    return np.fromiter(set(int(label) for _, label in dataset), dtype=int)
 
 
 def get_random_datasets(
@@ -68,7 +81,7 @@ def get_random_datasets(
     Returns:
         List of tuples of dataset, labels (int).
     """
-    full_labels = np.fromiter(set(int(label) for _, label in dataset), dtype=int)
+    full_labels = get_all_labels(dataset)
     rng = np.random.default_rng(seed)
     labels = rng.choice(full_labels, size=(num_ds, num_classes), replace=False)
     return [
