@@ -15,7 +15,7 @@ from data.dataset import DATASET_CONFIGS, DEFAULT_BATCH_SIZE, DEFAULT_SEED
 from embedding.embed import embed_dataset, embed_model
 from models.core import ChoiceNetv1, TransferModel
 from training import LOG_DIR, TLDS_DIR
-from training.create_tlds import DEFAULT_CSV_SUMMARY, PLANT_DISEASES_TRAIN_SAVE_DIR
+from training.create_tlds import DEFAULT_CSV_SUMMARY, PLANT_LEAVES_TRAIN_SAVE_DIR
 
 TLDataset: TypeAlias = list[tuple[str, tuple[np.ndarray, np.ndarray], float]]
 
@@ -24,7 +24,7 @@ def build_raw_tlds(
     summary_path: str,
 ) -> TLDataset:
     """Build a raw version of the transfer-learning dataset."""
-    plants_ft_ds = tf.data.Dataset.load(PLANT_DISEASES_TRAIN_SAVE_DIR)
+    plants_ft_ds = tf.data.Dataset.load(PLANT_LEAVES_TRAIN_SAVE_DIR)
     embedded_plants_ft_ds = embed_dataset(plants_ft_ds)
 
     tlds: TLDataset = []
