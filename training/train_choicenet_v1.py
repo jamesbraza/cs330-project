@@ -31,7 +31,7 @@ def build_raw_tlds(
     with open(summary_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader):
-            dataset_name = row["dataset"]
+            dataset_name: str = row["dataset"]
             if i == 0:
                 dataset_config = DATASET_CONFIGS[dataset_name]
                 model = TransferModel(
@@ -40,7 +40,9 @@ def build_raw_tlds(
                 )
             try:
                 tl_model_folder = ",".join(map(str, json.loads(row["labels"])))
-                if dataset_name == "cifar100":
+                if dataset_name == "cifar100" or dataset_name.startswith(
+                    "imagenet_resized"
+                ):
                     label = "random"
                 elif dataset_name == "bird-species":
                     label = "dissimilar"
