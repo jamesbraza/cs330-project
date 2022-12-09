@@ -25,7 +25,7 @@ DATASET_CONFIGS: dict[str, DatasetMetadata] = {
     "cifar100": DatasetMetadata("cifar100", 100, (32, 32, 3)),
     "bird-species": DatasetMetadata("bird-species", 450, (256, 256, 3)),
     "plant_village": DatasetMetadata("plant_village", 38, (256, 256, 3)),
-    "plant-leaves": DatasetMetadata("plant-leaves", 2, (6000, 4000, 3)),
+    "plant-leaves": DatasetMetadata("plant-leaves", 22, (6000, 4000, 3)),
 }
 
 DEFAULT_SEED = 42
