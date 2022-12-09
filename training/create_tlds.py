@@ -100,6 +100,8 @@ def train(args: argparse.Namespace) -> None:
         preprocessor=partial(preprocess_standardize, num_classes=len(plants_labels)),
         ft_ds_save_dir=PLANT_LEAVES_TRAIN_SAVE_DIR,
     )
+    # Reload in fine-tuning dataset as a speed optimization
+    plants_ft_ds = tf.data.Dataset.load(PLANT_LEAVES_TRAIN_SAVE_DIR)
 
     def compute_accuracy(tl_model: TransferModel) -> float:
         new_model = tl_model.clone(new_num_classes=len(plants_labels))
