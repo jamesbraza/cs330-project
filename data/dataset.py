@@ -25,6 +25,7 @@ DATASET_CONFIGS: dict[str, DatasetMetadata] = {
     "cifar100": DatasetMetadata("cifar100", 100, (32, 32, 3)),
     "bird-species": DatasetMetadata("bird-species", 450, (256, 256, 3)),
     "plant_village": DatasetMetadata("plant_village", 38, (256, 256, 3)),
+    "plant-leaves": DatasetMetadata("plant-leaves", 22, (6000, 4000, 3)),
 }
 
 DEFAULT_SEED = 42
@@ -114,9 +115,6 @@ PLANT_DISEASES_TRAIN = os.path.join(
 PLANT_DISEASES_VAL = os.path.join(
     DATA_DIR, *PLANT_DISEASES_REL_PATH.split("/"), "valid"
 )
-BIRD_SPECIES_REL_PATH = "bird-species"
-BIRD_SPECIES_TRAIN = os.path.join(DATA_DIR, *BIRD_SPECIES_REL_PATH.split("/"), "train")
-BIRD_SPECIES_VAL = os.path.join(DATA_DIR, *BIRD_SPECIES_REL_PATH.split("/"), "valid")
 
 
 def get_image_dataset_from_directory(
@@ -194,6 +192,42 @@ def get_plant_diseases_datasets(
         PlantLabel(raw_label, *raw_label.split("___")) for raw_label in raw_labels
     ]
     return train_ds, val_ds, labels
+
+
+PLANT_LEAVES_REL_PATH = "plant-leaves/Plants_2"
+PLANT_LEAVES_TRAIN = os.path.join(DATA_DIR, *PLANT_LEAVES_REL_PATH.split("/"), "train")
+PLANT_LEAVES_VAL = os.path.join(DATA_DIR, *PLANT_LEAVES_REL_PATH.split("/"), "valid")
+
+
+def get_plant_leaves_datasets(
+    num_train_batch: int = ALL,
+    num_val_batch: int = ALL,
+    seed: int = DEFAULT_SEED,
+    **from_dir_kwargs,
+) -> tuple[tf.data.Dataset, tf.data.Dataset, list[str]]:
+    """
+    Get the training and validation subsets of the plant leaves dataset.
+
+    SEE: https://www.kaggle.com/datasets/csafrit2/plant-leaves-for-image-classification
+
+    Returns:
+        Tuple of training dataset, validation dataset, labels.
+            NOTE: for labels, indices correspond with ID, values correspond
+            with string labels.
+    """
+    return get_image_dataset_from_directory(
+        train_dir=PLANT_LEAVES_TRAIN,
+        val_dir=PLANT_LEAVES_VAL,
+        num_train_batch=num_train_batch,
+        num_val_batch=num_val_batch,
+        seed=seed,
+        **from_dir_kwargs,
+    )
+
+
+BIRD_SPECIES_REL_PATH = "bird-species"
+BIRD_SPECIES_TRAIN = os.path.join(DATA_DIR, *BIRD_SPECIES_REL_PATH.split("/"), "train")
+BIRD_SPECIES_VAL = os.path.join(DATA_DIR, *BIRD_SPECIES_REL_PATH.split("/"), "valid")
 
 
 def get_bird_species_datasets(

@@ -18,10 +18,11 @@ from data.dataset import (
     DEFAULT_NUM_DATASETS,
     DEFAULT_SEED,
     PLANT_DISEASES_REL_PATH,
+    PLANT_LEAVES_REL_PATH,
     Shape,
     get_bird_species_datasets,
     get_dataset_subset,
-    get_plant_diseases_datasets,
+    get_plant_leaves_datasets,
     get_random_datasets,
     preprocess,
 )
@@ -32,6 +33,9 @@ from training import LOG_DIR, TLDS_DIR, TRAINING_DIR
 DEFAULT_CSV_SUMMARY = os.path.join(TRAINING_DIR, "tlds_summary.csv")
 PLANT_DISEASES_TRAIN_SAVE_DIR = os.path.join(
     DATA_DIR, *PLANT_DISEASES_REL_PATH.split("/"), "train_ds_export"
+)
+PLANT_LEAVES_TRAIN_SAVE_DIR = os.path.join(
+    DATA_DIR, *PLANT_LEAVES_REL_PATH.split("/"), "train_ds_export"
 )
 BIRD_SPECIES_TRAIN_SAVE_DIR = os.path.join(
     DATA_DIR, *BIRD_SPECIES_REL_PATH.split("/"), "train_ds_export"
@@ -51,7 +55,7 @@ def preprocess_standardize(
             if len(image_size) == 4:
                 _, *hw, _ = image_size
             elif len(image_size) == 3:
-                hw, _ = image_size
+                *hw, _ = image_size
             else:
                 raise NotImplementedError(f"Unimplemented shape {image_size}.")
             image = tf.image.resize(image, size=hw)
@@ -83,7 +87,7 @@ def train(args: argparse.Namespace) -> None:
         csv.writer(f).writerow(["dataset", "seed", "labels", "accuracy"])
 
     dataset_config = DATASET_CONFIGS[args.dataset]
-    plants_ft_ds, plants_test_ds, plants_labels = get_plant_diseases_datasets(
+    plants_ft_ds, plants_test_ds, plants_labels = get_plant_leaves_datasets(
         num_train_batch=args.ft_num_batches,
         num_val_batch=args.test_num_batches,
         seed=args.seed,
@@ -94,7 +98,7 @@ def train(args: argparse.Namespace) -> None:
         plants_ft_ds,
         plants_test_ds,
         preprocessor=partial(preprocess_standardize, num_classes=len(plants_labels)),
-        ft_ds_save_dir=PLANT_DISEASES_TRAIN_SAVE_DIR,
+        ft_ds_save_dir=PLANT_LEAVES_TRAIN_SAVE_DIR,
     )
 
     def compute_accuracy(tl_model: TransferModel) -> float:
@@ -265,7 +269,7 @@ def main() -> None:
     parser.add_argument(
         "--ft_num_batches",
         type=int,
-        default=math.ceil(2e3 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(1e3 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in the fine tuning dataset",
     )
     parser.add_argument(
@@ -277,7 +281,7 @@ def main() -> None:
     parser.add_argument(
         "--test_num_batches",
         type=int,
-        default=math.ceil(1e3 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(500 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in the test dataset",
     )
     parser.add_argument("--num_epochs", type=int, default=15, help="number of epochs")

@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 from embedding.embed import embed_model
-from models.core import ChoiceNetSimple, TransferModel
+from models.core import ChoiceNetv1, TransferModel
 
 
 def get_weight_matrix_input_predict(fine_tune_weights: str):
@@ -38,7 +38,7 @@ def predict(args):
     print(">>>>your fist", X_test.shape)
     print(">>>>your 2nd X", X_test2.shape)
 
-    model = ChoiceNetSimple()
+    model = ChoiceNetv1()
     checkpoint = tf.train.Checkpoint(model)
     checkpoint.restore(choice_net_weights).expect_partial()
 
