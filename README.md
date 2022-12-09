@@ -4,17 +4,21 @@
 
 ## Datasets
 
-We used two datasets from Kaggle:
+We used a few datasets from Kaggle:
 
 - [New Plant Diseases Dataset][2]:
   256 x 256 RGB JPG images of healthy and unhealthy crop leaves
+  - Replaced with [TensorFlow Datasets `plant_village` dataset][5]
+- [Plant Leaves for Image Classification][4]:
+  6000 x 4000 RGB JPG images of healthy and unhealthy leaves from 12 plants
 - [BIRDS 450 SPECIES- IMAGE CLASSIFICATION][3]:
   224 x 224 RGB JPG images of bird species
 
-Here's how to easily download both with the Kaggle API:
+Here's how to easily download them all with the Kaggle API:
 
 ```bash
 kaggle datasets download -p data/plant-diseases --unzip vipoooool/new-plant-diseases-dataset
+kaggle datasets download -p data/plant-diseases --unzip csafrit2/plant-leaves-for-image-classification
 kaggle datasets download -p data/bird-species --unzip gpiosenka/100-bird-species
 ```
 
@@ -81,3 +85,5 @@ Finally, need to rund td_predict
 [1]: https://cs330.stanford.edu/
 [2]: https://www.kaggle.com/datasets/vipoooool/new-plant-diseases-dataset
 [3]: https://www.kaggle.com/datasets/gpiosenka/100-bird-species
+[4]: https://www.kaggle.com/datasets/csafrit2/plant-leaves-for-image-classification
+[5]: https://www.tensorflow.org/datasets/catalog/plant_village
