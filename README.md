@@ -18,7 +18,7 @@ Here's how to easily download them all with the Kaggle API:
 
 ```bash
 kaggle datasets download -p data/plant-diseases --unzip vipoooool/new-plant-diseases-dataset
-kaggle datasets download -p data/plant-diseases --unzip csafrit2/plant-leaves-for-image-classification
+kaggle datasets download -p data/plant-leaves --unzip csafrit2/plant-leaves-for-image-classification
 kaggle datasets download -p data/bird-species --unzip gpiosenka/100-bird-species
 ```
 

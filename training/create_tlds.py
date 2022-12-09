@@ -15,7 +15,6 @@ from data.dataset import (
     DATASET_CONFIGS,
     DEFAULT_BATCH_SIZE,
     DEFAULT_NUM_CLASSES,
-    DEFAULT_NUM_DATASETS,
     DEFAULT_SEED,
     PLANT_DISEASES_REL_PATH,
     PLANT_LEAVES_REL_PATH,
@@ -86,7 +85,7 @@ def train(args: argparse.Namespace) -> None:
     with open(args.tlds_csv_summary, mode="w", encoding="utf-8") as f:
         csv.writer(f).writerow(["dataset", "seed", "labels", "accuracy"])
 
-    dataset_config = DATASET_CONFIGS[args.dataset]
+    dataset_config = DATASET_CONFIGS["cifar100"]
     plants_ft_ds, plants_test_ds, plants_labels = get_plant_leaves_datasets(
         num_train_batch=args.ft_num_batches,
         num_val_batch=args.test_num_batches,
@@ -132,11 +131,11 @@ def train(args: argparse.Namespace) -> None:
 
     # Save results for randomly initialized model
     model.save_weights(
-        os.path.join(TLDS_DIR, str(args.seed), args.dataset, "randinit", "tl_model")
+        os.path.join(TLDS_DIR, str(args.seed), "cifar100", "randinit", "tl_model")
     )
     with open(args.tlds_csv_summary, mode="a", encoding="utf-8") as f:
         csv.writer(f).writerow(
-            [args.dataset, args.seed, "randinit", compute_accuracy(model)]
+            ["cifar100", args.seed, "randinit", compute_accuracy(model)]
         )
 
     # 1. Save randomly initialized weights to begin training with the same state
@@ -152,9 +151,16 @@ def train(args: argparse.Namespace) -> None:
         "num_batches": args.tl_num_batches,
         "seed": args.seed,
     }
-    random_datasets = get_random_datasets(
-        dataset=tfds.load(name=args.dataset, split="train", as_supervised=True),
-        num_ds=args.tl_num_random_datasets,
+    cifar100_random_datasets = get_random_datasets(
+        dataset=tfds.load(name="cifar100", split="train", as_supervised=True),
+        num_ds=args.tl_num_random_cifar100_datasets,
+        **kwargs,
+    )
+    imagenet_random_datasets = get_random_datasets(
+        dataset=tfds.load(
+            name="imagenet_resized/32x32", split="train", as_supervised=True
+        ),
+        num_ds=args.tl_num_random_imagenet_datasets,
         **kwargs,
     )
     plants_village_datasets = get_random_datasets(
@@ -174,7 +180,8 @@ def train(args: argparse.Namespace) -> None:
         dataset=birds_train_ds, num_ds=args.tl_num_dissimilar_datasets, **kwargs
     )
     for i, (dataset_name, dataset, labels) in enumerate(
-        [(args.dataset, *v) for v in random_datasets]
+        [("cifar100", *v) for v in cifar100_random_datasets]
+        + [("imagenet_resized/32x32", *v) for v in imagenet_random_datasets]
         + [("plant_village", *v) for v in plants_village_datasets]
         + [("bird-species", *v) for v in birds_random_datasets]
     ):
@@ -230,13 +237,16 @@ def main() -> None:
         help="batch size during transfer learning, fine tuning, and prediction",
     )
     parser.add_argument(
-        "-d", "--dataset", type=str, default="cifar100", help="source dataset name"
+        "--tl_num_random_cifar100_datasets",
+        type=int,
+        default=10,
+        help="number of random transfer learning datasets to sample from CIFAR100",
     )
     parser.add_argument(
-        "--tl_num_random_datasets",
+        "--tl_num_random_imagenet_datasets",
         type=int,
-        default=DEFAULT_NUM_DATASETS,
-        help="number of random_transfer learning datasets to sample",
+        default=30,
+        help="number of random transfer learning datasets to sample from ImageNet",
     )
     parser.add_argument(
         "--tl_num_similar_datasets",
@@ -259,7 +269,7 @@ def main() -> None:
     parser.add_argument(
         "--tl_num_batches",
         type=int,
-        default=math.ceil(15e3 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(5e3 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in each transfer learning dataset",
     )
     parser.add_argument(
