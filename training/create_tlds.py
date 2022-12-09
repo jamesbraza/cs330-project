@@ -269,7 +269,7 @@ def main() -> None:
     parser.add_argument(
         "--tl_num_batches",
         type=int,
-        default=math.ceil(15e3 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(5e3 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in each transfer learning dataset",
     )
     parser.add_argument(
