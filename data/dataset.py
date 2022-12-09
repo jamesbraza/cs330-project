@@ -300,19 +300,17 @@ def split(
 
 def preprocess(
     dataset: tf.data.Dataset,
-    num_classes: int = DEFAULT_NUM_CLASSES,
     image_preprocessor: Callable[[tf.Tensor], tf.Tensor] | None = None,
+    label_preprocessor: Callable[[tf.Tensor], tf.Tensor] | None = None,
 ) -> tf.data.Dataset:
     """
     Preprocess the input dataset for training.
 
     Args:
         dataset: Dataset to preprocess.
-        num_classes: Number of classes present in the dataset.
-        image_preprocessor: Function to pre-process images per a model's requirements.
-            Default of None will not try to pre-process images.
-            Examples:
-            - VGG16: tf.keras.applications.vgg16.preprocess_input.
+        image_preprocessor: Function to pre-process images.
+            Example for VGG16: tf.keras.applications.vgg16.preprocess_input.
+        label_preprocessor: Optional function to pre-process labels.
 
     Returns:
         Preprocessed dataset.
@@ -321,9 +319,9 @@ def preprocess(
     def _preprocess(x: tf.Tensor, y: tf.Tensor) -> tuple[tf.Tensor, tf.Tensor]:
         if image_preprocessor is not None:
             x = image_preprocessor(x)
-        # NOTE: one_hot is a transformation step for Tensors, so we use it here
-        # over to_categorical
-        return x, tf.one_hot(y, depth=num_classes)
+        if label_preprocessor is not None:
+            y = label_preprocessor(y)
+        return x, y
 
     return dataset.map(_preprocess)
 

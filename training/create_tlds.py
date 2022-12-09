@@ -60,9 +60,12 @@ def preprocess_standardize(
             image = tf.image.resize(image, size=hw)
         return tf.image.per_image_standardization(image)
 
-    return preprocess(
-        ds, num_classes=num_classes, image_preprocessor=image_preprocessor
-    ).prefetch(prefetch_size)
+    def label_preprocessor(label: tf.Tensor) -> tf.Tensor:
+        return tf.one_hot(label, depth=num_classes)
+
+    return preprocess(ds, image_preprocessor, label_preprocessor).prefetch(
+        prefetch_size
+    )
 
 
 def preprocess_ds_save(
