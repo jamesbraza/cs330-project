@@ -64,8 +64,10 @@ def preprocess_standardize(
         return tf.one_hot(label, depth=num_classes)
 
     if labels is not None:
-        labels_tensor = tf.constant(labels)
-        mapped_labels_tensor = tf.constant([i for i in range(len(labels))])
+        labels_tensor = tf.constant(labels, dtype=tf.int32)
+        mapped_labels_tensor = tf.constant(
+            [i for i in range(len(labels))], dtype=tf.int32
+        )
         labels_map = tf.lookup.StaticHashTable(
             tf.lookup.KeyValueTensorInitializer(labels_tensor, mapped_labels_tensor),
             default_value=-1,
@@ -73,7 +75,7 @@ def preprocess_standardize(
 
         def label_remapping_preprocessor(label: tf.Tensor) -> tf.Tensor:
             """Remap labels to be in the range of the number of labels."""
-            return label_preprocessor(labels_map.lookup(label))
+            return label_preprocessor(labels_map.lookup(tf.cast(label, tf.int32)))
 
         labels_preprocessor = label_remapping_preprocessor
     else:
