@@ -57,11 +57,13 @@ class TransferModel(tf.keras.Model):
         self.dropout = tf.keras.layers.Dropout(rate=0.3)
         self.dense = tf.keras.layers.Dense(units=num_classes, activation="softmax")
 
-    def call(self, inputs, training=None, mask=None):
+    def call(self, inputs, training=None, mask=None, include_top: bool = True):
         x = self.input_layer(inputs)
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
+        if not include_top:  # Hack to get layer 3 activations
+            return x
         x = self.pooling(x)
         x = self.flatten(x)
         x = self.dropout(x, training=training)
