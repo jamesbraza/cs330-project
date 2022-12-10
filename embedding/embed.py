@@ -31,7 +31,7 @@ def embed_model(model: TransferModel) -> np.ndarray:
 DEFAULT_PCA_NUM_COMPONENTS = 256
 
 
-def embed_dataset(
+def embed_dataset_pca(
     dataset: np.ndarray | tf.data.Dataset,
     pca_num_components: int = DEFAULT_PCA_NUM_COMPONENTS,
 ) -> np.ndarray:
@@ -60,12 +60,12 @@ def get_npy_paths(path: str) -> list[str]:
 def pca_dataset(path: str) -> None:
     all_data_list = []
     for data_path in get_npy_paths(path):
-        all_data_list.append(embed_dataset(dataset=np.load(data_path)))
+        all_data_list.append(embed_dataset_pca(dataset=np.load(data_path)))
     np.save(os.path.join(path, "data.npy"), np.array(all_data_list))
 
 
 def pca_single_dataset(path: str, num_repeats: int = 1) -> np.ndarray:
-    x_average = embed_dataset(dataset=np.load(path))
+    x_average = embed_dataset_pca(dataset=np.load(path))
     return np.repeat(x_average[np.newaxis, :], repeats=num_repeats, axis=0)
 
 

@@ -18,7 +18,7 @@ from data.dataset import (
     DEFAULT_NUM_CLASSES,
     DEFAULT_SEED,
 )
-from embedding.embed import embed_dataset, embed_model
+from embedding.embed import embed_dataset_pca, embed_model
 from models.core import ChoiceNetv1, TransferModel
 from training import LOG_DIR, TLDS_DIR
 from training.create_tlds import DEFAULT_CSV_SUMMARY, PLANT_LEAVES_TRAIN_SAVE_DIR
@@ -70,7 +70,7 @@ def build_raw_tlds(
 ) -> TLDataset:
     """Build a raw version of the transfer-learning dataset."""
     plants_ft_ds = tf.data.Dataset.load(PLANT_LEAVES_TRAIN_SAVE_DIR)
-    embedded_plants_ft_ds = embed_dataset(plants_ft_ds)
+    embedded_plants_ft_ds = embed_dataset_pca(plants_ft_ds)
 
     tlds: TLDataset = []
     for tl_model, _, ds_nickname, accuracy in parse_summary(summary_path, num_classes):
