@@ -35,13 +35,22 @@ class TransferModel(tf.keras.Model):
         # Include input_layer so we can infer input shape for copy
         self.input_layer = tf.keras.layers.InputLayer(input_shape)
         self.layer1 = Conv2D(
-            filters=self.LAYER_1_NUM_FILTERS, kernel_size=self.KERNEL_SIZE, strides=2
+            name="conv2d_1",
+            filters=self.LAYER_1_NUM_FILTERS,
+            kernel_size=self.KERNEL_SIZE,
+            strides=2,
         )
         self.layer2 = Conv2D(
-            filters=self.LAYER_2_NUM_FILTERS, kernel_size=self.KERNEL_SIZE, strides=2
+            name="conv2d_2",
+            filters=self.LAYER_2_NUM_FILTERS,
+            kernel_size=self.KERNEL_SIZE,
+            strides=2,
         )
         self.layer3 = Conv2D(
-            filters=self.LAYER_3_NUM_FILTERS, kernel_size=self.KERNEL_SIZE, strides=2
+            name="conv2d_3",
+            filters=self.LAYER_3_NUM_FILTERS,
+            kernel_size=self.KERNEL_SIZE,
+            strides=2,
         )
         self.pooling = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))
         self.flatten = tf.keras.layers.Flatten()
