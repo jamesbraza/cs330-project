@@ -4,6 +4,7 @@ import csv
 import json
 import math
 import os
+from collections.abc import Iterable
 from typing import TypeAlias
 
 import matplotlib.collections
@@ -22,17 +23,11 @@ from models.core import ChoiceNetv1, TransferModel
 from training import LOG_DIR, TLDS_DIR
 from training.create_tlds import DEFAULT_CSV_SUMMARY, PLANT_LEAVES_TRAIN_SAVE_DIR
 
-TLDataset: TypeAlias = list[tuple[str, tuple[np.ndarray, np.ndarray], float]]
 
-
-def build_raw_tlds(
+def parse_summary(
     summary_path: str = DEFAULT_CSV_SUMMARY, num_classes: int = DEFAULT_NUM_CLASSES
-) -> TLDataset:
-    """Build a raw version of the transfer-learning dataset."""
-    plants_ft_ds = tf.data.Dataset.load(PLANT_LEAVES_TRAIN_SAVE_DIR)
-    embedded_plants_ft_ds = embed_dataset(plants_ft_ds)
-
-    tlds: TLDataset = []
+) -> Iterable[tf.keras.Model, str, str, float]:
+    """Yield TL model, dataset path, nickname, and accuracy tuples from the summary."""
     with open(summary_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader):
@@ -64,13 +59,24 @@ def build_raw_tlds(
             tl_weights_path = os.path.join(saved_path, "tl_model")
             tl_dataset_path = os.path.join(saved_path, "tl_dataset")
             model.load_weights(tl_weights_path).expect_partial()
-            tlds.append(
-                (
-                    label,
-                    (embed_model(model), embedded_plants_ft_ds),
-                    float(row["accuracy"]),
-                )
-            )
+            yield model, tl_dataset_path, label, float(row["accuracy"])
+
+
+TLDataset: TypeAlias = list[tuple[str, tuple[np.ndarray, np.ndarray], float]]
+
+
+def build_raw_tlds(
+    summary_path: str = DEFAULT_CSV_SUMMARY, num_classes: int = DEFAULT_NUM_CLASSES
+) -> TLDataset:
+    """Build a raw version of the transfer-learning dataset."""
+    plants_ft_ds = tf.data.Dataset.load(PLANT_LEAVES_TRAIN_SAVE_DIR)
+    embedded_plants_ft_ds = embed_dataset(plants_ft_ds)
+
+    tlds: TLDataset = []
+    for tl_model, _, ds_nickname, accuracy in parse_summary(summary_path, num_classes):
+        tlds.append(
+            (ds_nickname, (embed_model(tl_model), embedded_plants_ft_ds), accuracy)
+        )
     return tlds
 
 
@@ -134,10 +140,10 @@ def train_test(args: argparse.Namespace) -> None:
         batch_preds = preds[i : i + args.batch_size].squeeze()
         batch_accuracies = test_dataseq.get_accuracies(i)
         for j, (pred, accuracy) in enumerate(zip(batch_preds, batch_accuracies)):
-            label = tlds[i * test_dataseq.batch_size + j][0]
-            all_results[label].append((accuracy, pred))
+            dataset_nickname = tlds[i * test_dataseq.batch_size + j][0]
+            all_results[dataset_nickname].append((accuracy, pred))
             print(
-                f"Example {i}.{j} with label {label}: "
+                f"Example {i}.{j} with nickname {dataset_nickname}: "
                 f"predicted accuracy {pred * 100:.3f}%, "
                 f"actual accuracy {accuracy * 100:.3f}%."
             )
