@@ -11,7 +11,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
-from data.dataset import DATASET_CONFIGS, DEFAULT_BATCH_SIZE, DEFAULT_SEED
+from data.dataset import (
+    DATASET_CONFIGS,
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_NUM_CLASSES,
+    DEFAULT_SEED,
+)
 from embedding.embed import embed_dataset, embed_model
 from models.core import ChoiceNetv1, TransferModel
 from training import LOG_DIR, TLDS_DIR
@@ -21,7 +26,7 @@ TLDataset: TypeAlias = list[tuple[str, tuple[np.ndarray, np.ndarray], float]]
 
 
 def build_raw_tlds(
-    summary_path: str,
+    summary_path: str, num_classes: int = DEFAULT_NUM_CLASSES
 ) -> TLDataset:
     """Build a raw version of the transfer-learning dataset."""
     plants_ft_ds = tf.data.Dataset.load(PLANT_LEAVES_TRAIN_SAVE_DIR)
@@ -36,7 +41,7 @@ def build_raw_tlds(
                 dataset_config = DATASET_CONFIGS[dataset_name]
                 model = TransferModel(
                     input_shape=dataset_config.image_shape,
-                    num_classes=dataset_config.num_classes,
+                    num_classes=num_classes,
                 )
             try:
                 tl_model_folder = ",".join(map(str, json.loads(row["labels"])))
@@ -124,7 +129,7 @@ def train_test(args: argparse.Namespace) -> None:
 
     all_results: dict[str, list[tuple[float, float]]] = collections.defaultdict(list)
     for i in range(len(test_dataseq)):
-        batch_preds = preds[:, i]
+        batch_preds = preds[i : i + args.batch_size].squeeze()
         batch_accuracies = test_dataseq.get_accuracies(i)
         for j, (pred, accuracy) in enumerate(zip(batch_preds, batch_accuracies)):
             label = tlds[i * test_dataseq.batch_size + j][0]
