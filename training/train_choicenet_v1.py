@@ -26,7 +26,7 @@ TLDataset: TypeAlias = list[tuple[str, tuple[np.ndarray, np.ndarray], float]]
 
 
 def build_raw_tlds(
-    summary_path: str, num_classes: int = DEFAULT_NUM_CLASSES
+    summary_path: str = DEFAULT_CSV_SUMMARY, num_classes: int = DEFAULT_NUM_CLASSES
 ) -> TLDataset:
     """Build a raw version of the transfer-learning dataset."""
     plants_ft_ds = tf.data.Dataset.load(PLANT_LEAVES_TRAIN_SAVE_DIR)
@@ -58,10 +58,12 @@ def build_raw_tlds(
             except json.decoder.JSONDecodeError:
                 tl_model_folder = row["labels"]
                 label = "rand init"
-            weights_path = os.path.join(
-                TLDS_DIR, row["seed"], dataset_name, tl_model_folder, "tl_model"
+            saved_path = os.path.join(
+                TLDS_DIR, row["seed"], dataset_name, tl_model_folder
             )
-            model.load_weights(weights_path).expect_partial()
+            tl_weights_path = os.path.join(saved_path, "tl_model")
+            tl_dataset_path = os.path.join(saved_path, "tl_dataset")
+            model.load_weights(tl_weights_path).expect_partial()
             tlds.append(
                 (
                     label,
