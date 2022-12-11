@@ -12,7 +12,12 @@ from embedding.embed import embed_dataset_resnet50v2, embed_dataset_with_model
 from models.core import ChoiceNetv2
 from training import LOG_DIR
 from training.create_tlds import DEFAULT_CSV_SUMMARY, PLANT_LEAVES_TRAIN_SAVE_DIR
-from training.train_choicenet_v1 import TLDataset, TLDSSequence, parse_summary
+from training.train_choicenet_v1 import (
+    LABEL_TO_COLOR,
+    TLDataset,
+    TLDSSequence,
+    parse_summary,
+)
 
 
 def build_raw_tlds(
@@ -83,7 +88,11 @@ def train_test(args: argparse.Namespace) -> None:
 
     fig, ax = plt.subplots()
     scatter_plots: dict[str, matplotlib.collections.Collection] = {
-        label: ax.scatter(*list(zip(*data)), label=f"{label} (x{len(data)})")
+        label: ax.scatter(
+            *list(zip(*data)),
+            label=f"{label} (x{len(data)})",
+            color=LABEL_TO_COLOR[label],
+        )
         for label, data in all_results.items()
     }
     x_lim, y_lim = ax.get_xlim(), ax.get_ylim()

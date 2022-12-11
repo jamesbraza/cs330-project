@@ -62,6 +62,14 @@ def parse_summary(
             yield model, tl_dataset_path, label, float(row["accuracy"])
 
 
+LABEL_TO_COLOR: dict[str, str] = {
+    "dissimilar": "red",
+    "random": "orange",
+    "similar": "green",
+    "rand init": "grey",
+}
+
+
 TLDataset: TypeAlias = list[tuple[str, tuple[np.ndarray, np.ndarray], float]]
 
 
@@ -159,10 +167,13 @@ def train_test(args: argparse.Namespace) -> None:
 
     fig, ax = plt.subplots()
     scatter_plots: dict[str, matplotlib.collections.Collection] = {
-        label: ax.scatter(*list(zip(*data)), label=f"{label} (x{len(data)})")
+        label: ax.scatter(
+            *list(zip(*data)),
+            label=f"{label} (x{len(data)})",
+            color=LABEL_TO_COLOR[label],
+        )
         for label, data in all_results.items()
     }
-    scatter_plots["rand init"].set_color("grey")
     x_lim, y_lim = ax.get_xlim(), ax.get_ylim()
     ax.plot([0, 1], [0, 1], color="grey", label="unit line")
     ax.set_xlim(x_lim)
