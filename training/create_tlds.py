@@ -191,9 +191,9 @@ def train(args: argparse.Namespace) -> None:
     )
     for i, (dataset_name, dataset, labels) in enumerate(
         [("cifar100", *v) for v in cifar100_random_datasets]
-        + [("imagenet_resized/32x32", *v) for v in imagenet_random_datasets]
         + [("plant_village", *v) for v in plants_village_datasets]
         + [("bird-species", *v) for v in birds_random_datasets]
+        + [("imagenet_resized/32x32", *v) for v in imagenet_random_datasets]
     ):
         labels_name = str(list(labels)).replace(" ", "")
         # Keras can't handle [] per https://github.com/keras-team/keras/issues/17265
@@ -297,7 +297,7 @@ def main() -> None:
     parser.add_argument(
         "--ft_num_batches",
         type=int,
-        default=math.ceil(2e3 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(1.5e3 / DEFAULT_BATCH_SIZE),  # Keep small to emphasize TL
         help="number of batches to have in the fine tuning dataset",
     )
     parser.add_argument(
@@ -309,7 +309,7 @@ def main() -> None:
     parser.add_argument(
         "--test_num_batches",
         type=int,
-        default=math.ceil(1e3 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(2e3 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in the test dataset",
     )
     parser.add_argument("--num_epochs", type=int, default=15, help="number of epochs")
