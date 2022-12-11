@@ -132,7 +132,16 @@ def train_test(args: argparse.Namespace) -> None:
         metrics=["mse"],
     )
 
-    model.fit(training_dataseq)
+    model.fit(
+        training_dataseq,
+        epochs=args.num_epochs,
+        callbacks=[
+            tf.keras.callbacks.TensorBoard(
+                log_dir=os.path.join(LOG_DIR, "choicenet", str(args.seed)),
+                histogram_freq=1,
+            )
+        ],
+    )
     preds: np.ndarray = model.predict(test_dataseq)
 
     all_results: dict[str, list[tuple[float, float]]] = collections.defaultdict(list)
@@ -186,6 +195,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--learning_rate", type=float, default=1e-3, help="learning rate"
+    )
+    parser.add_argument(
+        "--num_epochs",
+        type=int,
+        default=15,
+        help="number of epochs for training ChoiceNet",
     )
     parser.add_argument(
         "--validation_split",
