@@ -29,6 +29,9 @@ DATASET_CONFIGS: dict[str, DatasetMetadata] = {
     "imagenet_resized/32x32": DatasetMetadata(
         "imagenet_resized/32x32", 1000, (32, 32, 3)
     ),
+    "imagenet_resized/64x64": DatasetMetadata(
+        "imagenet_resized/64x64", 1000, (64, 64, 3)
+    ),
 }
 
 DEFAULT_SEED = 42
