@@ -22,7 +22,6 @@ from data.dataset import (
     get_bird_species_datasets,
     get_plant_leaves_datasets,
     get_random_datasets,
-    preprocess,
 )
 from models import MODEL_SAVE_DIR
 from models.core import TransferModel
@@ -60,14 +59,14 @@ def preprocess_standardize(
             image = tf.image.resize(image, size=hw)
         return tf.image.per_image_standardization(image)
 
-    def label_preprocessor(label: tf.Tensor) -> tf.Tensor:
-        return tf.one_hot(label, depth=num_classes)
+    label_preprocessor = partial(tf.one_hot, depth=num_classes)
 
-    if labels is not None:
+    if labels is None:  # Don't remap labels
+        labels_preprocessor = label_preprocessor
+    else:  # Remap labels
+        assert len(labels) == num_classes
         labels_tensor = tf.constant(labels, dtype=tf.int32)
-        mapped_labels_tensor = tf.constant(
-            [i for i in range(len(labels))], dtype=tf.int32
-        )
+        mapped_labels_tensor = tf.constant(list(range(len(labels))), dtype=tf.int32)
         labels_map = tf.lookup.StaticHashTable(
             tf.lookup.KeyValueTensorInitializer(labels_tensor, mapped_labels_tensor),
             default_value=-1,
@@ -78,12 +77,10 @@ def preprocess_standardize(
             return label_preprocessor(labels_map.lookup(tf.cast(label, tf.int32)))
 
         labels_preprocessor = label_remapping_preprocessor
-    else:
-        labels_preprocessor = label_preprocessor
 
-    return preprocess(ds, image_preprocessor, labels_preprocessor).prefetch(
-        prefetch_size
-    )
+    return ds.map(
+        lambda x, y: (image_preprocessor(x), labels_preprocessor(y))
+    ).prefetch(prefetch_size)
 
 
 def preprocess_ds_save(
