@@ -134,3 +134,31 @@ class ChoiceNetv1(tf.keras.Model):
         x = self.layer1(concat)
         x = self.dropout(x, training=training)
         return self.dense(x)
+
+
+class ChoiceNetv2(tf.keras.Model):
+    MODEL_REDUCE_DIM = TransferModel.LAYER_3_NUM_FILTERS * math.prod(
+        TransferModel.KERNEL_SIZE
+    )
+    RESNET50V2_BEFORE_TOP_DIM = 2048
+
+    def __init__(self):
+        super().__init__()
+        self.weights_reduce = ReduceMatrix(
+            conv_filter_dim=self.MODEL_REDUCE_DIM, reduced_dim=256
+        )
+        self.dataset_reduce = ReduceMatrix(
+            conv_filter_dim=self.RESNET50V2_BEFORE_TOP_DIM, reduced_dim=256
+        )
+        self.flatten = tf.keras.layers.Flatten()
+        self.dense1 = tf.keras.layers.Dense(units=128, activation="relu")
+        self.dropout = tf.keras.layers.Dropout(rate=0.3)
+        self.dense2 = tf.keras.layers.Dense(units=1)
+
+    def call(self, inputs: Annotated[Sequence[tf.Tensor], 2], training=None, mask=None):
+        reduced_tl_model_weights = self.weights_reduce(inputs[0])
+        reduced_ft_dataset_weights = self.dataset_reduce(inputs[1])
+        x = self.flatten(reduced_tl_model_weights - reduced_ft_dataset_weights)
+        x = self.dense1(x)
+        x = self.dropout(x, training=training)
+        return self.dense2(x)
