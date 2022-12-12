@@ -158,7 +158,7 @@ class ChoiceNetv2(tf.keras.Model):
     def call(self, inputs: Annotated[Sequence[tf.Tensor], 2], training=None, mask=None):
         reduced_tl_model_weights = self.weights_reduce(inputs[0])
         reduced_ft_dataset_weights = self.dataset_reduce(inputs[1])
-        x = self.flatten(reduced_tl_model_weights - reduced_ft_dataset_weights)
+        x = self.flatten(reduced_tl_model_weights + reduced_ft_dataset_weights)
         x = self.dense1(x)
         x = self.dropout(x, training=training)
         return self.dense2(x)

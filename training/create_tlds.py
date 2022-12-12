@@ -37,6 +37,8 @@ PLANT_LEAVES_TRAIN_SAVE_DIR = os.path.join(
 BIRD_SPECIES_TRAIN_SAVE_DIR = os.path.join(
     DATA_DIR, *BIRD_SPECIES_REL_PATH.split("/"), "train_ds_export"
 )
+FINE_TUNE_DS_SAVE_NAME = "ft"
+TEST_DS_SAVE_NAME = "test"
 
 
 def preprocess_standardize(
@@ -87,13 +89,14 @@ def preprocess_ds_save(
     ft_ds: tf.data.Dataset,
     test_ds: tf.data.Dataset,
     preprocessor: Callable[[tf.data.Dataset], tf.data.Dataset],
-    ft_ds_save_dir: str,
+    save_dir: str,
 ) -> tuple[tf.data.Dataset, tf.data.Dataset]:
-    """Preprocess both fine-tuning and test datasets, saving the fine-tuning dataset."""
+    """Preprocess and save both fine-tuning and test datasets."""
     ft_ds, test_ds = (preprocessor(ds) for ds in (ft_ds, test_ds))
-    if os.path.exists(ft_ds_save_dir):
-        shutil.rmtree(ft_ds_save_dir)  # Only persist one dataset
-    ft_ds.save(ft_ds_save_dir)
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)  # Only persist one copy
+    ft_ds.save(os.path.join(save_dir, FINE_TUNE_DS_SAVE_NAME))
+    test_ds.save(os.path.join(save_dir, TEST_DS_SAVE_NAME))
     return ft_ds, test_ds
 
 
@@ -104,24 +107,32 @@ def train(args: argparse.Namespace) -> None:
         csv.writer(f).writerow(["dataset", "seed", "labels", "accuracy"])
 
     dataset_config = DATASET_CONFIGS["imagenet_resized/32x32"]
-    plants_ft_ds, plants_test_ds, plants_labels = get_plant_leaves_datasets(
-        num_train_batch=args.ft_num_batches,
-        num_val_batch=args.test_num_batches,
-        seed=args.seed,
-        batch_size=args.batch_size,
-        image_size=dataset_config.image_shape[:-1],
+
+    if not os.path.exists(PLANT_LEAVES_TRAIN_SAVE_DIR):
+        plants_ft_ds, plants_test_ds, plant_labels = get_plant_leaves_datasets(
+            num_train_batch=args.ft_num_batches,
+            num_val_batch=args.test_num_batches,
+            seed=args.seed,
+            batch_size=args.batch_size,
+            image_size=dataset_config.image_shape[:-1],
+        )
+        plants_ft_ds, plants_test_ds = preprocess_ds_save(
+            plants_ft_ds,
+            plants_test_ds,
+            preprocessor=partial(preprocess_standardize, num_classes=len(plant_labels)),
+            save_dir=PLANT_LEAVES_TRAIN_SAVE_DIR,
+        )
+    # Reload in fine-tuning and test datasets as a speed optimization
+    plants_ft_ds = tf.data.Dataset.load(
+        os.path.join(PLANT_LEAVES_TRAIN_SAVE_DIR, FINE_TUNE_DS_SAVE_NAME)
     )
-    plants_ft_ds, plants_test_ds = preprocess_ds_save(
-        plants_ft_ds,
-        plants_test_ds,
-        preprocessor=partial(preprocess_standardize, num_classes=len(plants_labels)),
-        ft_ds_save_dir=PLANT_LEAVES_TRAIN_SAVE_DIR,
+    plants_test_ds = tf.data.Dataset.load(
+        os.path.join(PLANT_LEAVES_TRAIN_SAVE_DIR, TEST_DS_SAVE_NAME)
     )
-    # Reload in fine-tuning dataset as a speed optimization
-    plants_ft_ds = tf.data.Dataset.load(PLANT_LEAVES_TRAIN_SAVE_DIR)
+    num_ft_classes = DATASET_CONFIGS["plant-leaves"].num_classes
 
     def compute_accuracy(tl_model: TransferModel) -> float:
-        new_model = tl_model.clone(new_num_classes=len(plants_labels))
+        new_model = tl_model.clone(new_num_classes=num_ft_classes)
         new_model.layer1.trainable = False
         new_model.layer2.trainable = False
 
@@ -191,9 +202,9 @@ def train(args: argparse.Namespace) -> None:
     )
     for i, (dataset_name, dataset, labels) in enumerate(
         [("cifar100", *v) for v in cifar100_random_datasets]
-        + [("imagenet_resized/32x32", *v) for v in imagenet_random_datasets]
         + [("plant_village", *v) for v in plants_village_datasets]
         + [("bird-species", *v) for v in birds_random_datasets]
+        + [("imagenet_resized/32x32", *v) for v in imagenet_random_datasets]
     ):
         labels_name = str(list(labels)).replace(" ", "")
         # Keras can't handle [] per https://github.com/keras-team/keras/issues/17265
@@ -297,7 +308,7 @@ def main() -> None:
     parser.add_argument(
         "--ft_num_batches",
         type=int,
-        default=math.ceil(2e3 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(1.5e3 / DEFAULT_BATCH_SIZE),  # Keep small to emphasize TL
         help="number of batches to have in the fine tuning dataset",
     )
     parser.add_argument(
@@ -309,7 +320,7 @@ def main() -> None:
     parser.add_argument(
         "--test_num_batches",
         type=int,
-        default=math.ceil(1e3 / DEFAULT_BATCH_SIZE),
+        default=math.ceil(2e3 / DEFAULT_BATCH_SIZE),
         help="number of batches to have in the test dataset",
     )
     parser.add_argument("--num_epochs", type=int, default=15, help="number of epochs")

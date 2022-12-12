@@ -4,7 +4,8 @@ import csv
 import json
 import math
 import os
-from collections.abc import Iterable
+import random
+from collections.abc import Iterable, Mapping
 from typing import TypeAlias
 
 import matplotlib.collections
@@ -21,13 +22,23 @@ from data.dataset import (
 from embedding.embed import embed_dataset_pca, embed_model
 from models.core import ChoiceNetv1, TransferModel
 from training import LOG_DIR, TLDS_DIR
-from training.create_tlds import DEFAULT_CSV_SUMMARY, PLANT_LEAVES_TRAIN_SAVE_DIR
+from training.create_tlds import (
+    DEFAULT_CSV_SUMMARY,
+    FINE_TUNE_DS_SAVE_NAME,
+    PLANT_LEAVES_TRAIN_SAVE_DIR,
+)
+
+# Key values are (dataset name, category, labels)
+TLDatasetKey: TypeAlias = tuple[str, str, str]
+TLDataset: TypeAlias = dict[
+    TLDatasetKey, tuple[str, tuple[np.ndarray, np.ndarray], float]
+]
 
 
 def parse_summary(
     summary_path: str = DEFAULT_CSV_SUMMARY, num_classes: int = DEFAULT_NUM_CLASSES
-) -> Iterable[tf.keras.Model, str, str, float]:
-    """Yield TL model, dataset path, nickname, and accuracy tuples from the summary."""
+) -> Iterable[tf.keras.Model, str, TLDatasetKey, float]:
+    """Yield TL model, dataset path, dataset key, and accuracy tuples."""
     with open(summary_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader):
@@ -43,41 +54,55 @@ def parse_summary(
                 if dataset_name == "cifar100" or dataset_name.startswith(
                     "imagenet_resized"
                 ):
-                    label = "random"
+                    key: TLDatasetKey = (dataset_name, "random", row["labels"])
                 elif dataset_name == "bird-species":
-                    label = "dissimilar"
+                    key = (dataset_name, "dissimilar", row["labels"])
                 elif dataset_name == "plant_village":
-                    label = "similar"
+                    key = (dataset_name, "similar", row["labels"])
                 else:
                     raise NotImplementedError(f"Unspecified dataset {dataset_name}.")
             except json.decoder.JSONDecodeError:
                 tl_model_folder = row["labels"]
-                label = "rand init"
+                key = (dataset_name, "rand init", row["labels"])
             saved_path = os.path.join(
                 TLDS_DIR, row["seed"], dataset_name, tl_model_folder
             )
             tl_weights_path = os.path.join(saved_path, "tl_model")
             tl_dataset_path = os.path.join(saved_path, "tl_dataset")
             model.load_weights(tl_weights_path).expect_partial()
-            yield model, tl_dataset_path, label, float(row["accuracy"])
+            yield model, tl_dataset_path, key, float(row["accuracy"])
 
 
-TLDataset: TypeAlias = list[tuple[str, tuple[np.ndarray, np.ndarray], float]]
+CATEGORY_TO_COLOR: dict[str, str] = {
+    "dissimilar": "red",
+    "random": "orange",
+    "similar": "green",
+    "rand init": "grey",
+}
+
+
+def shuffle_mapping(d: Mapping) -> dict:
+    """Shuffle the input mapping, not in place."""
+    as_tuple = list(d.items())
+    random.shuffle(as_tuple)
+    return dict(as_tuple)
 
 
 def build_raw_tlds(
     summary_path: str = DEFAULT_CSV_SUMMARY, num_classes: int = DEFAULT_NUM_CLASSES
 ) -> TLDataset:
-    """Build a raw version of the transfer-learning dataset."""
-    plants_ft_ds = tf.data.Dataset.load(PLANT_LEAVES_TRAIN_SAVE_DIR)
+    """Build a raw version of the transfer-learning dataset, with shuffling."""
+    plants_ft_ds = tf.data.Dataset.load(
+        os.path.join(PLANT_LEAVES_TRAIN_SAVE_DIR, FINE_TUNE_DS_SAVE_NAME)
+    )
     embedded_plants_ft_ds = embed_dataset_pca(plants_ft_ds)
 
-    tlds: TLDataset = []
-    for tl_model, _, ds_nickname, accuracy in parse_summary(summary_path, num_classes):
-        tlds.append(
-            (ds_nickname, (embed_model(tl_model), embedded_plants_ft_ds), accuracy)
-        )
-    return tlds
+    tlds: TLDataset = {}
+    for tl_model, _, key, accuracy in parse_summary(summary_path, num_classes):
+        # Use of the key ensures that if we have a duplicated TL dataset, that
+        # we use the most recently-saved one
+        tlds[key] = (key[1], (embed_model(tl_model), embedded_plants_ft_ds), accuracy)
+    return shuffle_mapping(tlds)
 
 
 class TLDSSequence(tf.keras.utils.Sequence):
@@ -89,7 +114,8 @@ class TLDSSequence(tf.keras.utils.Sequence):
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Vertically stack embeddings and accuracies into stacked ndarrays."""
         flattened = [
-            (x[0][np.newaxis, :], x[1][np.newaxis, :], y) for (_, x, y) in dataset
+            (x[0][np.newaxis, :], x[1][np.newaxis, :], y)
+            for (_, x, y) in dataset.values()
         ]
         x0, x1, y = zip(*flattened)
         return np.vstack(x0), np.vstack(x1), np.array(y)
@@ -109,6 +135,11 @@ class TLDSSequence(tf.keras.utils.Sequence):
         """Get only the dataset's accuracies for the input batch index."""
         bslice = slice(idx * self.batch_size, (idx + 1) * self.batch_size)
         return self.arrays[2][bslice]
+
+
+MAX_NUM_EPOCHS = 150
+EARLY_STOPPING_PATIENCE = 20
+LEARNING_RATE = 1e-4
 
 
 def train_test(args: argparse.Namespace) -> None:
@@ -137,9 +168,15 @@ def train_test(args: argparse.Namespace) -> None:
         epochs=args.num_epochs,
         callbacks=[
             tf.keras.callbacks.TensorBoard(
-                log_dir=os.path.join(LOG_DIR, "choicenet", str(args.seed)),
+                log_dir=os.path.join(LOG_DIR, "choicenet_v1", str(args.seed)),
                 histogram_freq=1,
-            )
+            ),
+            tf.keras.callbacks.EarlyStopping(
+                monitor="loss",
+                patience=EARLY_STOPPING_PATIENCE,
+                restore_best_weights=True,
+                verbose=1,
+            ),
         ],
     )
     preds: np.ndarray = model.predict(test_dataseq)
@@ -149,20 +186,23 @@ def train_test(args: argparse.Namespace) -> None:
         batch_preds = preds[i : i + args.batch_size].squeeze()
         batch_accuracies = test_dataseq.get_accuracies(i)
         for j, (pred, accuracy) in enumerate(zip(batch_preds, batch_accuracies)):
-            dataset_nickname = tlds[i * test_dataseq.batch_size + j][0]
-            all_results[dataset_nickname].append((accuracy, pred))
+            dataset_category = list(tlds)[i * test_dataseq.batch_size + j][1]
+            all_results[dataset_category].append((accuracy, pred))
             print(
-                f"Example {i}.{j} with nickname {dataset_nickname}: "
+                f"Example {i}.{j} with category {dataset_category}: "
                 f"predicted accuracy {pred * 100:.3f}%, "
                 f"actual accuracy {accuracy * 100:.3f}%."
             )
 
     fig, ax = plt.subplots()
     scatter_plots: dict[str, matplotlib.collections.Collection] = {
-        label: ax.scatter(*list(zip(*data)), label=f"{label} (x{len(data)})")
-        for label, data in all_results.items()
+        category: ax.scatter(
+            *list(zip(*data)),
+            label=f"{category} (x{len(data)})",
+            color=CATEGORY_TO_COLOR[category],
+        )
+        for category, data in all_results.items()
     }
-    scatter_plots["rand init"].set_color("grey")
     x_lim, y_lim = ax.get_xlim(), ax.get_ylim()
     ax.plot([0, 1], [0, 1], color="grey", label="unit line")
     ax.set_xlim(x_lim)
@@ -194,12 +234,12 @@ def main() -> None:
         help="transfer learning dataset summary CSV file location",
     )
     parser.add_argument(
-        "--learning_rate", type=float, default=1e-3, help="learning rate"
+        "--learning_rate", type=float, default=LEARNING_RATE, help="learning rate"
     )
     parser.add_argument(
         "--num_epochs",
         type=int,
-        default=15,
+        default=MAX_NUM_EPOCHS,
         help="number of epochs for training ChoiceNet",
     )
     parser.add_argument(

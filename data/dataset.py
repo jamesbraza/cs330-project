@@ -87,6 +87,7 @@ def get_random_datasets(
     full_labels = get_all_labels(dataset)
     rng = np.random.default_rng(seed)
     labels = rng.choice(full_labels, size=(num_ds, num_classes), replace=False)
+    labels.sort(axis=1)  # Sort rows by increasing class index
     return [
         (
             _batch_take(
@@ -213,6 +214,7 @@ def get_plant_diseases_datasets(
 PLANT_LEAVES_REL_PATH = "plant-leaves/Plants_2"
 PLANT_LEAVES_TRAIN = os.path.join(DATA_DIR, *PLANT_LEAVES_REL_PATH.split("/"), "train")
 PLANT_LEAVES_VAL = os.path.join(DATA_DIR, *PLANT_LEAVES_REL_PATH.split("/"), "valid")
+PLANT_LEAVES_TEST = os.path.join(DATA_DIR, *PLANT_LEAVES_REL_PATH.split("/"), "test")
 
 
 def get_plant_leaves_datasets(
@@ -231,14 +233,21 @@ def get_plant_leaves_datasets(
             NOTE: for labels, indices correspond with ID, values correspond
             with string labels.
     """
-    return get_image_dataset_from_directory(
+    train_ds, val_ds, labels = get_image_dataset_from_directory(
         train_dir=PLANT_LEAVES_TRAIN,
         val_dir=PLANT_LEAVES_VAL,
         num_train_batch=num_train_batch,
-        num_val_batch=num_val_batch,
         seed=seed,
         **from_dir_kwargs,
     )
+    from_dir_kwargs = {"seed": seed} | from_dir_kwargs
+    # Since the normal validation dataset is small, augment with the test dataset
+    val_ds_aug = val_ds.concatenate(
+        tf.keras.utils.image_dataset_from_directory(
+            PLANT_LEAVES_TEST, **from_dir_kwargs
+        )
+    )
+    return train_ds, val_ds_aug.take(num_val_batch), labels
 
 
 BIRD_SPECIES_REL_PATH = "bird-species"
