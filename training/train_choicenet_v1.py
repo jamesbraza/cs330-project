@@ -28,6 +28,7 @@ from training.create_tlds import (
     PLANT_LEAVES_TRAIN_SAVE_DIR,
 )
 
+# Key values are (dataset name, category, labels)
 TLDatasetKey: TypeAlias = tuple[str, str, str]
 TLDataset: TypeAlias = dict[
     TLDatasetKey, tuple[str, tuple[np.ndarray, np.ndarray], float]
@@ -36,8 +37,8 @@ TLDataset: TypeAlias = dict[
 
 def parse_summary(
     summary_path: str = DEFAULT_CSV_SUMMARY, num_classes: int = DEFAULT_NUM_CLASSES
-) -> Iterable[tf.keras.Model, str, tuple[str, str], float]:
-    """Yield TL model, dataset path, (ds name, ds category), and accuracy tuples."""
+) -> Iterable[tf.keras.Model, str, TLDatasetKey, float]:
+    """Yield TL model, dataset path, dataset key, and accuracy tuples."""
     with open(summary_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader):
