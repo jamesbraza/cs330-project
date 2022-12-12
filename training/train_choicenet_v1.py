@@ -28,8 +28,8 @@ from training.create_tlds import (
     PLANT_LEAVES_TRAIN_SAVE_DIR,
 )
 
-# Key values are (dataset name, category, labels)
-TLDatasetKey: TypeAlias = tuple[str, str, str]
+# Key values are (dataset name, category, seed, labels)
+TLDatasetKey: TypeAlias = tuple[str, str, str, str]
 TLDataset: TypeAlias = dict[
     TLDatasetKey, tuple[str, tuple[np.ndarray, np.ndarray], float]
 ]
@@ -42,7 +42,7 @@ def parse_summary(
     with open(summary_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader):
-            dataset_name: str = row["dataset"]
+            dataset_name, seed, labels = row["dataset"], row["seed"], row["labels"]
             if i == 0:
                 dataset_config = DATASET_CONFIGS[dataset_name]
                 model = TransferModel(
@@ -50,23 +50,21 @@ def parse_summary(
                     num_classes=num_classes,
                 )
             try:
-                tl_model_folder = ",".join(map(str, json.loads(row["labels"])))
+                tl_model_folder = ",".join(map(str, json.loads(labels)))
                 if dataset_name == "cifar100" or dataset_name.startswith(
                     "imagenet_resized"
                 ):
-                    key: TLDatasetKey = (dataset_name, "random", row["labels"])
+                    key: TLDatasetKey = (dataset_name, "random", seed, labels)
                 elif dataset_name == "bird-species":
-                    key = (dataset_name, "dissimilar", row["labels"])
+                    key = (dataset_name, "dissimilar", seed, labels)
                 elif dataset_name == "plant_village":
-                    key = (dataset_name, "similar", row["labels"])
+                    key = (dataset_name, "similar", seed, labels)
                 else:
                     raise NotImplementedError(f"Unspecified dataset {dataset_name}.")
             except json.decoder.JSONDecodeError:
-                tl_model_folder = row["labels"]
-                key = (dataset_name, "rand init", row["labels"])
-            saved_path = os.path.join(
-                TLDS_DIR, row["seed"], dataset_name, tl_model_folder
-            )
+                tl_model_folder = labels
+                key = (dataset_name, "rand init", seed, labels)
+            saved_path = os.path.join(TLDS_DIR, seed, dataset_name, tl_model_folder)
             tl_weights_path = os.path.join(saved_path, "tl_model")
             tl_dataset_path = os.path.join(saved_path, "tl_dataset")
             model.load_weights(tl_weights_path).expect_partial()
