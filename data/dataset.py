@@ -87,6 +87,7 @@ def get_random_datasets(
     full_labels = get_all_labels(dataset)
     rng = np.random.default_rng(seed)
     labels = rng.choice(full_labels, size=(num_ds, num_classes), replace=False)
+    labels.sort(axis=1)  # Sort rows by increasing class index
     return [
         (
             _batch_take(
