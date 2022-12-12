@@ -288,6 +288,5 @@ models/saved_models/
 
 # TLDS
 training/tlds/
-training/tlds_summary.csv
-training/choicenet_v1_performance.png
-training/choicenet_v2_performance.png
+training/tlds_summary*.csv
+training/choicenet_v*_performance.png
