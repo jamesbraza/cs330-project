@@ -11,36 +11,45 @@ from data.dataset import DEFAULT_BATCH_SIZE, DEFAULT_NUM_CLASSES, DEFAULT_SEED
 from embedding.embed import embed_dataset_resnet50v2, embed_dataset_with_model
 from models.core import ChoiceNetv2
 from training import LOG_DIR
-from training.create_tlds import DEFAULT_CSV_SUMMARY, PLANT_LEAVES_TRAIN_SAVE_DIR
+from training.create_tlds import (
+    DEFAULT_CSV_SUMMARY,
+    FINE_TUNE_DS_SAVE_NAME,
+    PLANT_LEAVES_TRAIN_SAVE_DIR,
+)
 from training.train_choicenet_v1 import (
+    CATEGORY_TO_COLOR,
     EARLY_STOPPING_PATIENCE,
-    LABEL_TO_COLOR,
     LEARNING_RATE,
     MAX_NUM_EPOCHS,
     TLDataset,
     TLDSSequence,
     parse_summary,
+    shuffle_mapping,
 )
 
 
 def build_raw_tlds(
     summary_path: str = DEFAULT_CSV_SUMMARY, num_classes: int = DEFAULT_NUM_CLASSES
 ) -> TLDataset:
-    """Build a raw version of the transfer-learning dataset."""
-    plants_ft_ds = tf.data.Dataset.load(PLANT_LEAVES_TRAIN_SAVE_DIR)
+    """Build a raw version of the transfer-learning dataset, with shuffling."""
+    plants_ft_ds = tf.data.Dataset.load(
+        os.path.join(PLANT_LEAVES_TRAIN_SAVE_DIR, FINE_TUNE_DS_SAVE_NAME)
+    )
     embedded_plants_ft_ds = embed_dataset_resnet50v2(plants_ft_ds)
 
-    tlds: TLDataset = []
-    for tl_model, tl_dataset_path, ds_nickname, accuracy in parse_summary(
+    tlds: TLDataset = {}
+    for tl_model, tl_dataset_path, key, accuracy in parse_summary(
         summary_path, num_classes
     ):
-        if ds_nickname == "rand init":
+        if key[1] == "rand init":
             continue  # Skip over rand init, as it has no associated TL dataset
         embedded_model = embed_dataset_with_model(
             dataset=tf.data.Dataset.load(tl_dataset_path), model=tl_model
         )
-        tlds.append((ds_nickname, (embedded_model, embedded_plants_ft_ds), accuracy))
-    return tlds
+        # Use of the key ensures that if we have a duplicated TL dataset, that
+        # we use the most recently-saved one
+        tlds[key] = (key[1], (embedded_model, embedded_plants_ft_ds), accuracy)
+    return shuffle_mapping(tlds)
 
 
 def train_test(args: argparse.Namespace) -> None:
@@ -87,22 +96,22 @@ def train_test(args: argparse.Namespace) -> None:
         batch_preds = preds[i : i + args.batch_size].squeeze()
         batch_accuracies = test_dataseq.get_accuracies(i)
         for j, (pred, accuracy) in enumerate(zip(batch_preds, batch_accuracies)):
-            dataset_nickname = tlds[i * test_dataseq.batch_size + j][0]
-            all_results[dataset_nickname].append((accuracy, pred))
+            dataset_category = list(tlds)[i * test_dataseq.batch_size + j][1]
+            all_results[dataset_category].append((accuracy, pred))
             print(
-                f"Example {i}.{j} with nickname {dataset_nickname}: "
+                f"Example {i}.{j} with nickname {dataset_category}: "
                 f"predicted accuracy {pred * 100:.3f}%, "
                 f"actual accuracy {accuracy * 100:.3f}%."
             )
 
     fig, ax = plt.subplots()
     scatter_plots: dict[str, matplotlib.collections.Collection] = {
-        label: ax.scatter(
+        category: ax.scatter(
             *list(zip(*data)),
-            label=f"{label} (x{len(data)})",
-            color=LABEL_TO_COLOR[label],
+            label=f"{category} (x{len(data)})",
+            color=CATEGORY_TO_COLOR[category],
         )
-        for label, data in all_results.items()
+        for category, data in all_results.items()
     }
     x_lim, y_lim = ax.get_xlim(), ax.get_ylim()
     ax.plot([0, 1], [0, 1], color="grey", label="unit line")
