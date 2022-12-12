@@ -13,7 +13,10 @@ from models.core import ChoiceNetv2
 from training import LOG_DIR
 from training.create_tlds import DEFAULT_CSV_SUMMARY, PLANT_LEAVES_TRAIN_SAVE_DIR
 from training.train_choicenet_v1 import (
+    EARLY_STOPPING_PATIENCE,
     LABEL_TO_COLOR,
+    LEARNING_RATE,
+    MAX_NUM_EPOCHS,
     TLDataset,
     TLDSSequence,
     parse_summary,
@@ -66,9 +69,15 @@ def train_test(args: argparse.Namespace) -> None:
         epochs=args.num_epochs,
         callbacks=[
             tf.keras.callbacks.TensorBoard(
-                log_dir=os.path.join(LOG_DIR, "choicenet", str(args.seed)),
+                log_dir=os.path.join(LOG_DIR, "choicenet_v2", str(args.seed)),
                 histogram_freq=1,
-            )
+            ),
+            tf.keras.callbacks.EarlyStopping(
+                monitor="loss",
+                patience=EARLY_STOPPING_PATIENCE,
+                restore_best_weights=True,
+                verbose=1,
+            ),
         ],
     )
     preds: np.ndarray = model.predict(test_dataseq)
@@ -126,12 +135,12 @@ def main() -> None:
         help="transfer learning dataset summary CSV file location",
     )
     parser.add_argument(
-        "--learning_rate", type=float, default=1e-3, help="learning rate"
+        "--learning_rate", type=float, default=LEARNING_RATE, help="learning rate"
     )
     parser.add_argument(
         "--num_epochs",
         type=int,
-        default=15,
+        default=MAX_NUM_EPOCHS,
         help="number of epochs for training ChoiceNet",
     )
     parser.add_argument(
