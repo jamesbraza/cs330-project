@@ -21,6 +21,7 @@ from training.train_choicenet_v1 import (
     EARLY_STOPPING_PATIENCE,
     LEARNING_RATE,
     MAX_NUM_EPOCHS,
+    VALIDATION_SPLIT,
     TLDataset,
     TLDSSequence,
     parse_summary,
@@ -62,9 +63,11 @@ def train_test(args: argparse.Namespace) -> None:
         test_dataseq = training_dataseq
     else:
         training_dataseq = TLDSSequence(
-            tlds[:num_training_ds], batch_size=args.batch_size
+            dict(list(tlds.items())[:num_training_ds]), batch_size=args.batch_size
         )
-        test_dataseq = TLDSSequence(tlds[num_training_ds:], batch_size=args.batch_size)
+        test_dataseq = TLDSSequence(
+            dict(list(tlds.items())[num_training_ds:]), batch_size=args.batch_size
+        )
 
     model = ChoiceNetv2()
     model.compile(
@@ -155,7 +158,7 @@ def main() -> None:
     parser.add_argument(
         "--validation_split",
         type=float,
-        default=0.0,
+        default=VALIDATION_SPLIT,
         help="fraction of transfer learning datasets to use for validation",
     )
     parser.add_argument(

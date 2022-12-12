@@ -138,6 +138,7 @@ class TLDSSequence(tf.keras.utils.Sequence):
 MAX_NUM_EPOCHS = 150
 EARLY_STOPPING_PATIENCE = 20
 LEARNING_RATE = 1e-4
+VALIDATION_SPLIT = 0.2
 
 
 def train_test(args: argparse.Namespace) -> None:
@@ -150,9 +151,11 @@ def train_test(args: argparse.Namespace) -> None:
         test_dataseq = training_dataseq
     else:
         training_dataseq = TLDSSequence(
-            tlds[:num_training_ds], batch_size=args.batch_size
+            dict(list(tlds.items())[:num_training_ds]), batch_size=args.batch_size
         )
-        test_dataseq = TLDSSequence(tlds[num_training_ds:], batch_size=args.batch_size)
+        test_dataseq = TLDSSequence(
+            dict(list(tlds.items())[num_training_ds:]), batch_size=args.batch_size
+        )
 
     model = ChoiceNetv1()
     model.compile(
@@ -243,7 +246,7 @@ def main() -> None:
     parser.add_argument(
         "--validation_split",
         type=float,
-        default=0.0,
+        default=VALIDATION_SPLIT,
         help="fraction of transfer learning datasets to use for validation",
     )
     parser.add_argument(
