@@ -138,24 +138,30 @@ class TLDSSequence(tf.keras.utils.Sequence):
 MAX_NUM_EPOCHS = 150
 EARLY_STOPPING_PATIENCE = 20
 LEARNING_RATE = 1e-4
-VALIDATION_SPLIT = 0.2
+VALIDATION_SPLIT = 1.0
+VALIDATION_SEED_UNSPECIFIED = -1
 
 
 def train_test(args: argparse.Namespace) -> None:
     tf.random.set_seed(args.seed)
+    B = args.batch_size
 
     tlds = build_raw_tlds(summary_path=args.tlds_csv_summary)
     num_training_ds = int(len(tlds) * (1 - args.validation_split))
     if num_training_ds >= len(tlds):  # Reuse training ds as test ds
-        training_dataseq = TLDSSequence(tlds, batch_size=args.batch_size)
+        training_dataseq = TLDSSequence(tlds, batch_size=B)
         test_dataseq = training_dataseq
+        test_subset = tlds
     else:
-        training_dataseq = TLDSSequence(
-            dict(list(tlds.items())[:num_training_ds]), batch_size=args.batch_size
-        )
-        test_dataseq = TLDSSequence(
-            dict(list(tlds.items())[num_training_ds:]), batch_size=args.batch_size
-        )
+        if args.validation_seed != VALIDATION_SEED_UNSPECIFIED:
+            seed = str(args.validation_seed)
+            training_subset = {key: tlds[key] for key in tlds.keys() if key[2] != seed}
+            test_subset = {key: tlds[key] for key in tlds.keys() if key[2] == seed}
+        else:
+            training_subset = dict(list(tlds.items())[:num_training_ds])
+            test_subset = dict(list(tlds.items())[num_training_ds:])
+        training_dataseq = TLDSSequence(training_subset, batch_size=B)
+        test_dataseq = TLDSSequence(test_subset, batch_size=B)
 
     model = ChoiceNetv1()
     model.compile(
@@ -180,14 +186,16 @@ def train_test(args: argparse.Namespace) -> None:
             ),
         ],
     )
-    preds: np.ndarray = model.predict(test_dataseq)
+    loss, mse = model.evaluate(test_dataseq)
+    print(f"On the test dataset, ChoiceNet v1 had a MSE of {mse}.")
 
+    preds: np.ndarray = model.predict(test_dataseq)
     all_results: dict[str, list[tuple[float, float]]] = collections.defaultdict(list)
     for i in range(len(test_dataseq)):
-        batch_preds = preds[i : i + args.batch_size].squeeze()
+        batch_preds = preds[i * B : (i + 1) * B].squeeze()
         batch_accuracies = test_dataseq.get_accuracies(i)
         for j, (pred, accuracy) in enumerate(zip(batch_preds, batch_accuracies)):
-            dataset_category = list(tlds)[i * test_dataseq.batch_size + j][1]
+            dataset_category = list(test_subset)[i * B + j][1]
             all_results[dataset_category].append((accuracy, pred))
             print(
                 f"Example {i}.{j} with category {dataset_category}: "
@@ -248,6 +256,12 @@ def main() -> None:
         type=float,
         default=VALIDATION_SPLIT,
         help="fraction of transfer learning datasets to use for validation",
+    )
+    parser.add_argument(
+        "--validation_seed",
+        type=int,
+        default=VALIDATION_SEED_UNSPECIFIED,
+        help="seed to use for validation, instead of the validation split",
     )
     parser.add_argument(
         "--batch_size",
