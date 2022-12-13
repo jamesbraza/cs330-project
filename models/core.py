@@ -162,3 +162,43 @@ class ChoiceNetv2(tf.keras.Model):
         x = self.dense1(x)
         x = self.dropout(x, training=training)
         return self.dense2(x)
+
+
+class Model_ChoiceNet_wegith(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+
+        self.layer_reduce = ReduceMatrix(conv_filter_dim=1152, reduced_dim=16)
+        self.flat = self.flatten = tf.keras.layers.Flatten()
+        self.layer1 = tf.keras.layers.Dense(units=128, activation="relu")
+        self.dropout = tf.keras.layers.Dropout(rate=0.3)
+        self.dense = tf.keras.layers.Dense(units=1)
+
+    def call(self, inputs, training=None, mask=None):
+        # =====dimention reduction for nn layers
+        x = self.layer_reduce(inputs)
+        x = self.flat(x)
+        x = self.layer1(x)
+        x = self.dropout(x, training=training)
+        output = self.dense(x)
+        return output
+
+
+class Model_ChoiceNet_emb(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+
+        self.layer_reduce = ReduceMatrix(conv_filter_dim=8193, reduced_dim=64)
+        self.flat = self.flatten = tf.keras.layers.Flatten()
+        self.layer1 = tf.keras.layers.Dense(units=64, activation="relu")
+        self.dropout = tf.keras.layers.Dropout(rate=0.3)
+        self.dense = tf.keras.layers.Dense(units=1)
+
+    def call(self, inputs, training=None, mask=None):
+        # =====dimention
+        x = self.layer_reduce(inputs)
+        x = self.flat(x)
+        x = self.layer1(x)
+        x = self.dropout(x, training=training)
+        output = self.dense(x)
+        return output
